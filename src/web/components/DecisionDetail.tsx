@@ -10,8 +10,11 @@ import { useTheme } from '../contexts/ThemeContext';
 import { sanitizeUrlTitle } from '../utils/urlHelpers';
 
 // Utility function for ID transformations
+// URLs now use full decision IDs (e.g. "adr-3"), so no stripping is needed.
+// Kept for backward-compat with any old numeric-only URLs that may still appear.
 const stripIdPrefix = (id: string): string => {
-	if (id.startsWith('decision-')) return id.replace('decision-', '');
+	// If it already looks like a prefixed ID, return as-is
+	if (/^[a-zA-Z]+-/.test(id)) return id;
 	return id;
 };
 
@@ -60,9 +63,12 @@ const MarkdownEditor = memo(function MarkdownEditor({
 	);
 });
 
-// Utility function to add decision prefix for API calls
+// Utility function to add decision prefix for API calls.
+// If the id is already prefixed (e.g. "adr-3"), return as-is.
+// Numeric-only IDs are legacy; fall back to "decision-" prefix.
 const addDecisionPrefix = (id: string): string => {
-	return id.startsWith('decision-') ? id : `decision-${id}`;
+	if (/^[a-zA-Z]+-/.test(id)) return id;
+	return `decision-${id}`;
 };
 
 interface DecisionDetailProps {
@@ -121,9 +127,9 @@ export default function DecisionDetail({ decisions, onRefreshData }: DecisionDet
 		
 		try {
 			setIsLoading(true);
-			// Find decision from props
+			// Find decision from props (case-insensitive to handle mixed-case IDs across file formats)
 			const prefixedId = addDecisionPrefix(id);
-			const decision = decisions.find(d => d.id === prefixedId);
+			const decision = decisions.find(d => d.id.toLowerCase() === prefixedId.toLowerCase());
 			
 			// Always try to fetch the decision from API, whether we found it in decisions or not
 			// This ensures deep linking works even before the parent component loads the decisions array

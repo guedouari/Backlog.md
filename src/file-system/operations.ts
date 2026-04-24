@@ -12,6 +12,8 @@ import {
 	buildGlobPattern,
 	extractAnyPrefix,
 	generateNextId,
+	getDecisionPrefixes,
+	getTaskPrefixes,
 	idForFilename,
 	normalizeId,
 } from "../utils/prefix-config.ts";
@@ -345,28 +347,29 @@ export class FileSystem {
 			return [];
 		}
 
-		// Get configured task prefix
 		const config = await this.loadConfig();
-		const taskPrefix = (config?.prefixes?.task ?? "task").toLowerCase();
-		const globPattern = buildGlobPattern(taskPrefix);
-
-		let taskFiles: string[];
-		try {
-			taskFiles = await Array.fromAsync(new Bun.Glob(globPattern).scan({ cwd: tasksDir, followSymlinks: true }));
-		} catch (_error) {
-			return [];
-		}
+		const taskPrefixes = getTaskPrefixes(config);
 
 		let tasks: Task[] = [];
-		for (const file of taskFiles) {
-			const filepath = join(tasksDir, file);
+		for (const prefix of taskPrefixes) {
+			const globPattern = buildGlobPattern(prefix.toLowerCase());
+			let taskFiles: string[];
 			try {
-				const content = await Bun.file(filepath).text();
-				const task = normalizeTaskIdentity(parseTask(content));
-				tasks.push({ ...task, filePath: filepath });
-			} catch (error) {
-				if (process.env.DEBUG) {
-					console.error(`Failed to parse task file ${filepath}`, error);
+				taskFiles = await Array.fromAsync(new Bun.Glob(globPattern).scan({ cwd: tasksDir, followSymlinks: true }));
+			} catch (_error) {
+				continue;
+			}
+
+			for (const file of taskFiles) {
+				const filepath = join(tasksDir, file);
+				try {
+					const content = await Bun.file(filepath).text();
+					const task = normalizeTaskIdentity(parseTask(content));
+					tasks.push({ ...task, filePath: filepath });
+				} catch (error) {
+					if (process.env.DEBUG) {
+						console.error(`Failed to parse task file ${filepath}`, error);
+					}
 				}
 			}
 		}
@@ -392,28 +395,31 @@ export class FileSystem {
 			return [];
 		}
 
-		// Get configured task prefix
 		const config = await this.loadConfig();
-		const taskPrefix = (config?.prefixes?.task ?? "task").toLowerCase();
-		const globPattern = buildGlobPattern(taskPrefix);
-
-		let taskFiles: string[];
-		try {
-			taskFiles = await Array.fromAsync(new Bun.Glob(globPattern).scan({ cwd: completedDir, followSymlinks: true }));
-		} catch (_error) {
-			return [];
-		}
+		const taskPrefixes = getTaskPrefixes(config);
 
 		const tasks: Task[] = [];
-		for (const file of taskFiles) {
-			const filepath = join(completedDir, file);
+		for (const prefix of taskPrefixes) {
+			const globPattern = buildGlobPattern(prefix.toLowerCase());
+			let taskFiles: string[];
 			try {
-				const content = await Bun.file(filepath).text();
-				const task = parseTask(content);
-				tasks.push({ ...task, filePath: filepath });
-			} catch (error) {
-				if (process.env.DEBUG) {
-					console.error(`Failed to parse completed task file ${filepath}`, error);
+				taskFiles = await Array.fromAsync(
+					new Bun.Glob(globPattern).scan({ cwd: completedDir, followSymlinks: true }),
+				);
+			} catch (_error) {
+				continue;
+			}
+
+			for (const file of taskFiles) {
+				const filepath = join(completedDir, file);
+				try {
+					const content = await Bun.file(filepath).text();
+					const task = parseTask(content);
+					tasks.push({ ...task, filePath: filepath });
+				} catch (error) {
+					if (process.env.DEBUG) {
+						console.error(`Failed to parse completed task file ${filepath}`, error);
+					}
 				}
 			}
 		}
@@ -429,28 +435,31 @@ export class FileSystem {
 			return [];
 		}
 
-		// Get configured task prefix
 		const config = await this.loadConfig();
-		const taskPrefix = (config?.prefixes?.task ?? "task").toLowerCase();
-		const globPattern = buildGlobPattern(taskPrefix);
-
-		let taskFiles: string[];
-		try {
-			taskFiles = await Array.fromAsync(new Bun.Glob(globPattern).scan({ cwd: archiveTasksDir, followSymlinks: true }));
-		} catch (_error) {
-			return [];
-		}
+		const taskPrefixes = getTaskPrefixes(config);
 
 		const tasks: Task[] = [];
-		for (const file of taskFiles) {
-			const filepath = join(archiveTasksDir, file);
+		for (const prefix of taskPrefixes) {
+			const globPattern = buildGlobPattern(prefix.toLowerCase());
+			let taskFiles: string[];
 			try {
-				const content = await Bun.file(filepath).text();
-				const task = parseTask(content);
-				tasks.push({ ...task, filePath: filepath });
-			} catch (error) {
-				if (process.env.DEBUG) {
-					console.error(`Failed to parse archived task file ${filepath}`, error);
+				taskFiles = await Array.fromAsync(
+					new Bun.Glob(globPattern).scan({ cwd: archiveTasksDir, followSymlinks: true }),
+				);
+			} catch (_error) {
+				continue;
+			}
+
+			for (const file of taskFiles) {
+				const filepath = join(archiveTasksDir, file);
+				try {
+					const content = await Bun.file(filepath).text();
+					const task = parseTask(content);
+					tasks.push({ ...task, filePath: filepath });
+				} catch (error) {
+					if (process.env.DEBUG) {
+						console.error(`Failed to parse archived task file ${filepath}`, error);
+					}
 				}
 			}
 		}
@@ -691,23 +700,29 @@ export class FileSystem {
 
 	// Decision log operations
 	async saveDecision(decision: Decision): Promise<void> {
-		// Normalize ID - remove "decision-" prefix if present
-		const normalizedId = decision.id.replace(/^decision-/, "");
-		const filename = `decision-${normalizedId} - ${this.sanitizeFilename(decision.title)}.md`;
+		// Extract the prefix from the decision ID, defaulting to "decision"
+		const prefix = extractAnyPrefix(decision.id) ?? "decision";
+		const normalizedId = decision.id.replace(new RegExp(`^${prefix}-`, "i"), "");
+		const filename = `${prefix.toLowerCase()}-${normalizedId} - ${this.sanitizeFilename(decision.title)}.md`;
 		const decisionsDir = await this.getDecisionsDir();
 		const filepath = join(decisionsDir, filename);
 		const content = serializeDecision(decision);
 
-		const matches = await Array.fromAsync(
-			new Bun.Glob("decision-*.md").scan({ cwd: decisionsDir, followSymlinks: true }),
-		);
-		for (const match of matches) {
-			if (match === filename) continue;
-			if (!match.startsWith(`decision-${normalizedId} -`)) continue;
-			try {
-				await unlink(join(decisionsDir, match));
-			} catch {
-				// Ignore cleanup errors
+		// Clean up any existing file for this decision (regardless of prefix)
+		const config = await this.loadConfig();
+		const decisionPrefixes = getDecisionPrefixes(config);
+		for (const dp of decisionPrefixes) {
+			const matches = await Array.fromAsync(
+				new Bun.Glob(buildGlobPattern(dp.toLowerCase())).scan({ cwd: decisionsDir, followSymlinks: true }),
+			);
+			for (const match of matches) {
+				if (match === filename) continue;
+				if (!match.startsWith(`${dp.toLowerCase()}-${normalizedId} -`)) continue;
+				try {
+					await unlink(join(decisionsDir, match));
+				} catch {
+					// Ignore cleanup errors
+				}
 			}
 		}
 
@@ -718,19 +733,41 @@ export class FileSystem {
 	async loadDecision(decisionId: string): Promise<Decision | null> {
 		try {
 			const decisionsDir = await this.getDecisionsDir();
-			const files = await Array.fromAsync(
-				new Bun.Glob("decision-*.md").scan({ cwd: decisionsDir, followSymlinks: true }),
-			);
+			const config = await this.loadConfig();
+			const decisionPrefixes = getDecisionPrefixes(config);
 
-			// Normalize ID - remove "decision-" prefix if present
-			const normalizedId = decisionId.replace(/^decision-/, "");
-			const decisionFile = files.find((file) => file.startsWith(`decision-${normalizedId} -`));
+			// Determine the prefix and body from the input ID
+			const inputPrefix = extractAnyPrefix(decisionId);
+			if (inputPrefix) {
+				// Prefixed ID: search only that prefix
+				const normalizedId = decisionId.replace(new RegExp(`^${inputPrefix}-`, "i"), "");
+				const files = await Array.fromAsync(
+					new Bun.Glob(buildGlobPattern(inputPrefix.toLowerCase())).scan({
+						cwd: decisionsDir,
+						followSymlinks: true,
+					}),
+				);
+				const decisionFile = files.find((file) =>
+					file.startsWith(`${inputPrefix.toLowerCase()}-${normalizedId} -`),
+				);
+				if (!decisionFile) return null;
+				const content = await Bun.file(join(decisionsDir, decisionFile)).text();
+				return parseDecision(content);
+			}
 
-			if (!decisionFile) return null;
+			// Numeric-only ID: search across all configured decision prefixes
+			for (const dp of decisionPrefixes) {
+				const files = await Array.fromAsync(
+					new Bun.Glob(buildGlobPattern(dp.toLowerCase())).scan({ cwd: decisionsDir, followSymlinks: true }),
+				);
+				const decisionFile = files.find((file) => file.startsWith(`${dp.toLowerCase()}-${decisionId} -`));
+				if (decisionFile) {
+					const content = await Bun.file(join(decisionsDir, decisionFile)).text();
+					return parseDecision(content);
+				}
+			}
 
-			const filepath = join(decisionsDir, decisionFile);
-			const content = await Bun.file(filepath).text();
-			return parseDecision(content);
+			return null;
 		} catch (_error) {
 			return null;
 		}
@@ -800,18 +837,33 @@ export class FileSystem {
 	async listDecisions(): Promise<Decision[]> {
 		try {
 			const decisionsDir = await this.getDecisionsDir();
-			const decisionFiles = await Array.fromAsync(
-				new Bun.Glob("decision-*.md").scan({ cwd: decisionsDir, followSymlinks: true }),
-			);
+			const config = await this.loadConfig();
+			const decisionPrefixes = getDecisionPrefixes(config);
+
 			const decisions: Decision[] = [];
-			for (const file of decisionFiles) {
-				// Filter out README files as they're just instruction files
-				if (file.toLowerCase().match(/^readme\.md$/i)) {
-					continue;
+			const seenIds = new Set<string>();
+
+			for (const dp of decisionPrefixes) {
+				const decisionFiles = await Array.fromAsync(
+					new Bun.Glob(buildGlobPattern(dp.toLowerCase())).scan({ cwd: decisionsDir, followSymlinks: true }),
+				);
+				for (const file of decisionFiles) {
+					// Filter out README files
+					if (file.toLowerCase().match(/^readme\.md$/i)) continue;
+					const filepath = join(decisionsDir, file);
+					try {
+						const content = await Bun.file(filepath).text();
+						const decision = parseDecision(content);
+						if (!seenIds.has(decision.id)) {
+							seenIds.add(decision.id);
+							decisions.push(decision);
+						}
+					} catch (error) {
+						if (process.env.DEBUG) {
+							console.error(`Failed to parse decision file ${filepath}`, error);
+						}
+					}
 				}
-				const filepath = join(decisionsDir, file);
-				const content = await Bun.file(filepath).text();
-				decisions.push(parseDecision(content));
 			}
 			return sortByTaskId(decisions);
 		} catch {
@@ -1384,7 +1436,23 @@ ${description || `Milestone: ${title}`}`,
 					config.onStatusChange = value.replace(/^['"]|['"]$/g, "");
 					break;
 				case "task_prefix":
-					config.prefixes = { task: value.replace(/['"]/g, "") };
+					config.prefixes = { ...(config.prefixes ?? { task: "task" }), task: value.replace(/['"]/g, "") };
+					break;
+				case "epic_prefix":
+					config.prefixes = { ...(config.prefixes ?? { task: "task" }), epic: value.replace(/['"]/g, "") };
+					break;
+				case "feat_prefix":
+					config.prefixes = { ...(config.prefixes ?? { task: "task" }), feat: value.replace(/['"]/g, "") };
+					break;
+				case "decision_prefixes":
+					if (value.startsWith("[") && value.endsWith("]")) {
+						const arrayContent = value.slice(1, -1);
+						const parsed = arrayContent
+							.split(",")
+							.map((item) => item.trim().replace(/['"]/g, ""))
+							.filter(Boolean);
+						config.prefixes = { ...(config.prefixes ?? { task: "task" }), decisionPrefixes: parsed };
+					}
 					break;
 				case "backlog_directory":
 				case "backlogDirectory":
@@ -1445,6 +1513,11 @@ ${description || `Milestone: ${title}`}`,
 			...(typeof config.activeBranchDays === "number" ? [`active_branch_days: ${config.activeBranchDays}`] : []),
 			...(config.onStatusChange ? [`onStatusChange: '${config.onStatusChange}'`] : []),
 			...(config.prefixes?.task ? [`task_prefix: "${config.prefixes.task}"`] : []),
+			...(config.prefixes?.epic ? [`epic_prefix: "${config.prefixes.epic}"`] : []),
+			...(config.prefixes?.feat ? [`feat_prefix: "${config.prefixes.feat}"`] : []),
+			...(Array.isArray(config.prefixes?.decisionPrefixes) && config.prefixes.decisionPrefixes.length > 0
+				? [`decision_prefixes: [${config.prefixes.decisionPrefixes.map((p) => `"${p}"`).join(", ")}]`]
+				: []),
 			...(config.backlogDirectory ? [`backlog_directory: "${config.backlogDirectory}"`] : []),
 		];
 

@@ -57,6 +57,13 @@ describe("Task path utilities", () => {
 			expect(normalizeTaskId("jira-789")).toBe("JIRA-789");
 		});
 
+		it("should preserve ID's own prefix even when a different fallback prefix is given", () => {
+			// EPIC-5 keeps its own prefix even if the config task prefix is "back"
+			expect(normalizeTaskId("EPIC-5", "back")).toBe("EPIC-5");
+			expect(normalizeTaskId("epic-3", "back")).toBe("EPIC-3");
+			expect(normalizeTaskId("feat-2", "back")).toBe("FEAT-2");
+		});
+
 		it("should handle empty strings", () => {
 			expect(normalizeTaskId("")).toBe("TASK-");
 		});

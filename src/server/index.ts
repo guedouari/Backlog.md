@@ -1083,7 +1083,9 @@ export class BacklogServer {
 	private async handleGetDecision(decisionId: string): Promise<Response> {
 		try {
 			const store = await this.getContentStoreInstance();
-			const normalizedId = decisionId.startsWith("decision-") ? decisionId : `decision-${decisionId}`;
+			// If the ID already has a prefix (any letters- pattern), use as-is.
+			// Legacy numeric-only IDs fall back to the "decision-" prefix.
+			const normalizedId = /^[a-zA-Z]+-/.test(decisionId) ? decisionId : `decision-${decisionId}`;
 			const decision = store.getDecisions().find((item) => item.id === normalizedId || item.id === decisionId);
 
 			if (!decision) {

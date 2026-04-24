@@ -12,7 +12,7 @@ import { DEFAULT_DIRECTORIES } from "../constants/index.ts";
 import type { GitOperations } from "../git/operations.ts";
 import { parseTask } from "../markdown/parser.ts";
 import type { BacklogConfig, Task } from "../types/index.ts";
-import { buildPathIdRegex, normalizeId } from "../utils/prefix-config.ts";
+import { buildPathIdRegex, escapeRegex, getTaskPrefixes, normalizeId } from "../utils/prefix-config.ts";
 import { normalizeTaskId, normalizeTaskIdentity } from "../utils/task-path.ts";
 import type { TaskDirectoryType } from "./cross-branch-tasks.ts";
 
@@ -98,10 +98,28 @@ export async function buildRemoteTaskIndex(
 	backlogDir = "backlog",
 	sinceDays?: number,
 	stateCollector?: BranchTaskStateEntry[],
-	prefix = DEFAULT_TASK_PREFIX,
+	prefix: string | string[] = DEFAULT_TASK_PREFIX,
 	includeCompleted = false,
 ): Promise<Map<string, RemoteIndexEntry[]>> {
 	const out = new Map<string, RemoteIndexEntry[]>();
+	const prefixes = Array.isArray(prefix) ? prefix : [prefix];
+
+	// Build a regex that matches any of the configured prefixes.
+	// Capture group 1 = matched prefix, capture group 2 = numeric body.
+	const idRegex =
+		prefixes.length === 1
+			? buildPathIdRegex(prefixes[0])
+			: new RegExp(`(${prefixes.map(escapeRegex).join("|")})-(\\d+(?:\\.\\d+)*)`, "i");
+
+	const extractId = (m: RegExpMatchArray): string => {
+		if (prefixes.length === 1) {
+			// Single prefix: m[1] = numeric body (original behavior)
+			return normalizeId(m[1] ?? "", prefixes[0]);
+		}
+		// Multi-prefix: m[1] = matched prefix, m[2] = numeric body
+		const matchedPrefix = m[1] ?? prefixes[0];
+		return normalizeId(`${matchedPrefix}-${m[2] ?? ""}`, matchedPrefix);
+	};
 
 	const normalized = branches.map(normalizeRemoteBranch).filter((b): b is string => Boolean(b));
 
@@ -126,15 +144,12 @@ export async function buildRemoteTaskIndex(
 				// Get last modified times for all files in one pass
 				const lm = await git.getBranchLastModifiedMap(ref, listPath, sinceDays);
 
-				// Build regex for configured prefix (no ^ anchor for path matching)
-				const idRegex = buildPathIdRegex(prefix);
-
 				for (const f of files) {
-					// Extract task ID from filename using configured prefix
+					// Extract task ID from filename using configured prefix(es)
 					const m = f.match(idRegex);
 					if (!m?.[1]) continue;
 
-					const id = normalizeId(m[1], prefix);
+					const id = extractId(m);
 					const lastModified = lm.get(f) ?? new Date(0);
 					const entry: RemoteIndexEntry = { id, branch: br, path: f, lastModified };
 
@@ -225,10 +240,26 @@ export async function buildLocalBranchTaskIndex(
 	backlogDir = "backlog",
 	sinceDays?: number,
 	stateCollector?: BranchTaskStateEntry[],
-	prefix = DEFAULT_TASK_PREFIX,
+	prefix: string | string[] = DEFAULT_TASK_PREFIX,
 	includeCompleted = false,
 ): Promise<Map<string, RemoteIndexEntry[]>> {
 	const out = new Map<string, RemoteIndexEntry[]>();
+	const prefixes = Array.isArray(prefix) ? prefix : [prefix];
+
+	// Build a regex that matches any of the configured prefixes.
+	// Capture group 1 = matched prefix, capture group 2 = numeric body.
+	const idRegex =
+		prefixes.length === 1
+			? buildPathIdRegex(prefixes[0])
+			: new RegExp(`(${prefixes.map(escapeRegex).join("|")})-(\\d+(?:\\.\\d+)*)`, "i");
+
+	const extractId = (m: RegExpMatchArray): string => {
+		if (prefixes.length === 1) {
+			return normalizeId(m[1] ?? "", prefixes[0]);
+		}
+		const matchedPrefix = m[1] ?? prefixes[0];
+		return normalizeId(`${matchedPrefix}-${m[2] ?? ""}`, matchedPrefix);
+	};
 
 	const normalized = branches.map((b) => normalizeLocalBranch(b, currentBranch)).filter((b): b is string => Boolean(b));
 
@@ -255,15 +286,12 @@ export async function buildLocalBranchTaskIndex(
 				// Get last modified times for all files in one pass
 				const lm = await git.getBranchLastModifiedMap(br, listPath, sinceDays);
 
-				// Build regex for configured prefix (no ^ anchor for path matching)
-				const idRegex = buildPathIdRegex(prefix);
-
 				for (const f of files) {
-					// Extract task ID from filename using configured prefix
+					// Extract task ID from filename using configured prefix(es)
 					const m = f.match(idRegex);
 					if (!m?.[1]) continue;
 
-					const id = normalizeId(m[1], prefix);
+					const id = extractId(m);
 					const lastModified = lm.get(f) ?? new Date(0);
 					const entry: RemoteIndexEntry = { id, branch: br, path: f, lastModified };
 
@@ -503,14 +531,14 @@ export async function loadRemoteTasks(
 		onProgress?.(`Indexing ${branches.length} recent remote branches (last ${days} days)...`);
 
 		// Build a cheap index without fetching content
-		const taskPrefix = userConfig?.prefixes?.task ?? DEFAULT_TASK_PREFIX;
+		const taskPrefixes = getTaskPrefixes(userConfig ?? undefined);
 		const remoteIndex = await buildRemoteTaskIndex(
 			gitOps,
 			branches,
 			backlogDir,
 			days,
 			stateCollector,
-			taskPrefix,
+			taskPrefixes,
 			includeCompleted,
 		);
 
@@ -634,7 +662,7 @@ export async function loadLocalBranchTasks(
 		onProgress?.(`Indexing ${localBranches.length - 1} other local branches...`);
 
 		// Build index of tasks from other local branches
-		const taskPrefix = userConfig?.prefixes?.task ?? DEFAULT_TASK_PREFIX;
+		const taskPrefixes = getTaskPrefixes(userConfig ?? undefined);
 		const localBranchIndex = await buildLocalBranchTaskIndex(
 			gitOps,
 			localBranches,
@@ -642,7 +670,7 @@ export async function loadLocalBranchTasks(
 			backlogDir,
 			days,
 			stateCollector,
-			taskPrefix,
+			taskPrefixes,
 			includeCompleted,
 		);
 

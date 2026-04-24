@@ -385,7 +385,8 @@ export class ContentStore {
 		const decisionsDir = this.filesystem.decisionsDir;
 		const watcher: FSWatcher = watch(decisionsDir, { recursive: false }, (eventType, filename) => {
 			const file = this.normalizeFilename(filename);
-			if (!file || !file.startsWith("decision-") || !file.endsWith(".md")) {
+			// Accept any prefix pattern (decision-, adr-, dsc-, apr-, etc.) ending in .md
+			if (!file || !/^[a-zA-Z]+-/.test(file) || !file.endsWith(".md")) {
 				this.enqueue(async () => {
 					await this.refreshDecisionsFromDisk();
 				});

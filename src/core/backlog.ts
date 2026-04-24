@@ -732,9 +732,9 @@ export class Core {
 	 * - Document: /documents only
 	 * - Decision: /decisions only
 	 */
-	async generateNextId(type: EntityType = EntityType.Task, parent?: string): Promise<string> {
+	async generateNextId(type: EntityType = EntityType.Task, parent?: string, prefixOverride?: string): Promise<string> {
 		const config = await this.fs.loadConfig();
-		const prefix = getPrefixForType(type, config ?? undefined);
+		const prefix = prefixOverride ?? getPrefixForType(type, config ?? undefined);
 
 		// Collect existing IDs based on entity type
 		const allIds = await this.getExistingIdsForType(type);
@@ -977,7 +977,9 @@ export class Core {
 		const resolvedStatus = isDraft ? "Draft" : status || config?.defaultStatus || FALLBACK_STATUS;
 
 		const { task, filePath } = await this.withCreateLock(async () => {
-			const id = await this.generateNextId(entityType, isDraft ? undefined : input.parentTaskId);
+			// prefix override: for non-draft tasks, allow epic/feat/custom prefixes
+			const prefixOverride = !isDraft && input.prefix ? input.prefix : undefined;
+			const id = await this.generateNextId(entityType, isDraft ? undefined : input.parentTaskId, prefixOverride);
 			const task: Task = {
 				id,
 				title: input.title.trim(),

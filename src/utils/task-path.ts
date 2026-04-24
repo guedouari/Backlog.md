@@ -36,7 +36,9 @@ const DEFAULT_TASK_PREFIX = "task";
  */
 export function normalizeTaskId(taskId: string, prefix: string = DEFAULT_TASK_PREFIX): string {
 	const inferredPrefix = extractAnyPrefix(taskId);
-	const effectivePrefix = inferredPrefix && prefix === DEFAULT_TASK_PREFIX ? inferredPrefix : prefix;
+	// If the ID already contains a prefix (e.g. "EPIC-5"), preserve it regardless of
+	// the `prefix` param. Only apply the fallback prefix for bare numeric IDs.
+	const effectivePrefix = inferredPrefix ?? prefix;
 	return normalizeId(taskId, effectivePrefix);
 }
 

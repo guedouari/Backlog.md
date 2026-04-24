@@ -403,7 +403,7 @@ const SideNavigation = memo(function SideNavigation({
 									return `/documentation/${stripIdPrefix(item.id)}/${sanitizeUrlTitle(item.title)}`;
 								}
 								if (result.type === 'decision') {
-									return `/decisions/${stripIdPrefix(item.id)}/${sanitizeUrlTitle(item.title)}`;
+									return `/decisions/${item.id}/${sanitizeUrlTitle(item.title)}`;
 								}
 								return `/?highlight=${encodeURIComponent(item.id)}`;
 							};
@@ -666,7 +666,7 @@ const SideNavigation = memo(function SideNavigation({
 										filteredDecisions.map((decision) => (
 											<NavLink
 												key={decision.id}
-												to={`/decisions/${stripIdPrefix(decision.id)}/${sanitizeUrlTitle(decision.title)}`}
+												to={`/decisions/${decision.id}/${sanitizeUrlTitle(decision.title)}`}
 												className={({ isActive }) =>
 													`flex items-center space-x-3 px-3 py-2 text-sm rounded-lg transition-colors duration-200 ${
 														isActive

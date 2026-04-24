@@ -1330,8 +1330,9 @@ export async function generateNextDocId(core: Core): Promise<string> {
 	return `doc-${nextIdNumber}`;
 }
 
-export async function generateNextDecisionId(core: Core): Promise<string> {
+export async function generateNextDecisionId(core: Core, prefix = "decision"): Promise<string> {
 	const config = await core.filesystem.loadConfig();
+	const normalizedPrefix = prefix.toLowerCase().replace(/-+$/, "");
 	// Load local decisions
 	const decisions = await core.filesystem.listDecisions();
 	const allIds: string[] = [];
@@ -1350,13 +1351,16 @@ export async function generateNextDecisionId(core: Core): Promise<string> {
 
 		const branches = await core.gitOps.listAllBranches();
 
+		// Match the specific prefix for this decision type to get an independent sequence
+		const prefixRegex = new RegExp(`${normalizedPrefix}-(\\d+)`, "i");
+
 		// Load files from all branches in parallel
 		const branchFilePromises = branches.map(async (branch) => {
 			const files = await core.gitOps.listFilesInTree(branch, `${backlogDir}/decisions`);
 			return files
 				.map((file) => {
-					const match = file.match(/decision-(\d+)/);
-					return match ? `decision-${match[1]}` : null;
+					const match = file.match(prefixRegex);
+					return match ? `${normalizedPrefix}-${match[1]}` : null;
 				})
 				.filter((id): id is string => id !== null);
 		});
@@ -1372,15 +1376,18 @@ export async function generateNextDecisionId(core: Core): Promise<string> {
 		}
 	}
 
-	// Add local decision IDs
+	// Add local decision IDs matching this prefix
+	const prefixIdRegex = new RegExp(`^${normalizedPrefix}-(\\d+)$`, "i");
 	for (const decision of decisions) {
-		allIds.push(decision.id);
+		if (prefixIdRegex.test(decision.id)) {
+			allIds.push(decision.id);
+		}
 	}
 
-	// Find the highest numeric ID
+	// Find the highest numeric ID for this specific prefix
 	let max = 0;
 	for (const id of allIds) {
-		const match = id.match(/^decision-(\d+)$/);
+		const match = id.match(prefixIdRegex);
 		if (match) {
 			const num = Number.parseInt(match[1] || "0", 10);
 			if (num > max) max = num;
@@ -1389,13 +1396,14 @@ export async function generateNextDecisionId(core: Core): Promise<string> {
 
 	const nextIdNumber = max + 1;
 	const padding = config?.zeroPaddedIds;
+	const upperPrefix = normalizedPrefix.toUpperCase();
 
 	if (padding && typeof padding === "number" && padding > 0) {
 		const paddedId = String(nextIdNumber).padStart(padding, "0");
-		return `decision-${paddedId}`;
+		return `${upperPrefix}-${paddedId}`;
 	}
 
-	return `decision-${nextIdNumber}`;
+	return `${upperPrefix}-${nextIdNumber}`;
 }
 
 const taskCmd = program.command("task").aliases(["tasks"]);
@@ -1424,6 +1432,7 @@ taskCmd
 	.option("--notes <text>", "add implementation notes")
 	.option("--final-summary <text>", "add final summary")
 	.option("--draft")
+	.option("--type <type>", "set task category prefix: task (default), epic, feat, or any configured prefix")
 	.option("-p, --parent <taskId>", "specify parent task ID")
 	.option(
 		"--depends-on <taskIds>",
@@ -1508,6 +1517,7 @@ taskCmd
 				acceptanceCriteria: criteria.map((text) => ({ text, checked: false })),
 				definitionOfDoneAdd: toStringArray(options.dod),
 				disableDefinitionOfDoneDefaults: options.dodDefaults === false,
+				prefix: options.type ? String(options.type) : undefined,
 			});
 
 			if (usePlainOutput) {
@@ -3022,10 +3032,12 @@ const decisionCmd = program.command("decision");
 decisionCmd
 	.command("create <title>")
 	.option("-s, --status <status>")
+	.option("--type <type>", "decision category prefix: decision (default), dsc, apr, adr, or any configured prefix")
 	.action(async (title: string, options) => {
 		const cwd = await requireProjectRoot();
 		const core = new Core(cwd);
-		const id = await generateNextDecisionId(core);
+		const prefix = options.type ? String(options.type) : undefined;
+		const id = await generateNextDecisionId(core, prefix);
 		const decision: Decision = {
 			id,
 			title: title as string,
@@ -3521,6 +3533,9 @@ configCmd
 			console.log(`  bypassGitHooks: ${config.bypassGitHooks ?? "(not set)"}`);
 			console.log(`  zeroPaddedIds: ${config.zeroPaddedIds ?? "(disabled)"}`);
 			console.log(`  taskPrefix: ${config.prefixes?.task || "task"} (read-only)`);
+			console.log(`  epicPrefix: ${config.prefixes?.epic || "(not set)"} (read-only)`);
+			console.log(`  featPrefix: ${config.prefixes?.feat || "(not set)"} (read-only)`);
+			console.log(`  decisionPrefixes: [${(config.prefixes?.decisionPrefixes ?? ["decision"]).join(", ")}] (read-only)`);
 			console.log(`  checkActiveBranches: ${config.checkActiveBranches ?? "true"}`);
 			console.log(`  activeBranchDays: ${config.activeBranchDays ?? "30"}`);
 		} catch (err) {

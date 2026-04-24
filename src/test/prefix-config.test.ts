@@ -4,18 +4,22 @@ import {
 	buildFilenameIdRegex,
 	buildGlobPattern,
 	buildIdRegex,
+	DEFAULT_DECISION_PREFIX,
 	DEFAULT_PREFIX_CONFIG,
 	extractAnyPrefix,
 	extractIdBody,
 	extractIdNumbers,
 	generateNextId,
 	generateNextSubtaskId,
+	getDecisionPrefixes,
 	getDefaultPrefixConfig,
 	getPrefixForType,
+	getTaskPrefixes,
 	hasPrefix,
 	idsEqual,
 	mergePrefixConfig,
 	normalizeId,
+	normalizePrefix,
 } from "../utils/prefix-config.ts";
 
 describe("prefix-config", () => {
@@ -52,6 +56,29 @@ describe("prefix-config", () => {
 		test("uses custom task value when provided", () => {
 			const config = mergePrefixConfig({ task: "issue" });
 			expect(config.task).toBe("issue");
+		});
+
+		test("includes epic when provided", () => {
+			const config = mergePrefixConfig({ task: "back", epic: "epic" });
+			expect(config.task).toBe("back");
+			expect(config.epic).toBe("epic");
+		});
+
+		test("includes feat when provided", () => {
+			const config = mergePrefixConfig({ task: "back", feat: "feat" });
+			expect(config.feat).toBe("feat");
+		});
+
+		test("includes decisionPrefixes when provided", () => {
+			const config = mergePrefixConfig({ decisionPrefixes: ["adr", "dsc"] });
+			expect(config.decisionPrefixes).toEqual(["adr", "dsc"]);
+		});
+
+		test("omits epic/feat/decisionPrefixes when not provided", () => {
+			const config = mergePrefixConfig({ task: "back" });
+			expect(config.epic).toBeUndefined();
+			expect(config.feat).toBeUndefined();
+			expect(config.decisionPrefixes).toBeUndefined();
 		});
 	});
 
@@ -362,6 +389,82 @@ describe("prefix-config", () => {
 
 		test("handles word IDs", () => {
 			expect(extractAnyPrefix("bug-fix-login")).toBe("bug");
+		});
+	});
+
+	describe("normalizePrefix", () => {
+		test("strips trailing dash", () => {
+			expect(normalizePrefix("BACK-")).toBe("BACK");
+		});
+
+		test("strips multiple trailing dashes", () => {
+			expect(normalizePrefix("epic--")).toBe("epic");
+		});
+
+		test("trims whitespace", () => {
+			expect(normalizePrefix("  feat  ")).toBe("feat");
+		});
+
+		test("returns prefix unchanged when clean", () => {
+			expect(normalizePrefix("back")).toBe("back");
+			expect(normalizePrefix("ADR")).toBe("ADR");
+		});
+	});
+
+	describe("getTaskPrefixes", () => {
+		test("returns default task prefix when no config", () => {
+			expect(getTaskPrefixes()).toEqual(["task"]);
+		});
+
+		test("returns configured task prefix", () => {
+			const config = { prefixes: { task: "back" } } as BacklogConfig;
+			expect(getTaskPrefixes(config)).toEqual(["back"]);
+		});
+
+		test("includes epic prefix when configured", () => {
+			const config = { prefixes: { task: "back", epic: "epic" } } as BacklogConfig;
+			expect(getTaskPrefixes(config)).toEqual(["back", "epic"]);
+		});
+
+		test("includes feat prefix when configured", () => {
+			const config = { prefixes: { task: "back", feat: "feat" } } as BacklogConfig;
+			expect(getTaskPrefixes(config)).toEqual(["back", "feat"]);
+		});
+
+		test("includes all three prefixes when all configured", () => {
+			const config = { prefixes: { task: "back", epic: "epic", feat: "feat" } } as BacklogConfig;
+			expect(getTaskPrefixes(config)).toEqual(["back", "epic", "feat"]);
+		});
+
+		test("normalizes trailing dashes from prefixes", () => {
+			const config = { prefixes: { task: "BACK-", epic: "EPIC-" } } as BacklogConfig;
+			expect(getTaskPrefixes(config)).toEqual(["BACK", "EPIC"]);
+		});
+	});
+
+	describe("getDecisionPrefixes", () => {
+		test("returns default decision prefix when no config", () => {
+			expect(getDecisionPrefixes()).toEqual([DEFAULT_DECISION_PREFIX]);
+		});
+
+		test("returns configured decision prefixes", () => {
+			const config = { prefixes: { task: "back", decisionPrefixes: ["adr", "dsc"] } } as BacklogConfig;
+			expect(getDecisionPrefixes(config)).toEqual(["adr", "dsc"]);
+		});
+
+		test("returns default when decisionPrefixes is empty array", () => {
+			const config = { prefixes: { task: "back", decisionPrefixes: [] } } as BacklogConfig;
+			expect(getDecisionPrefixes(config)).toEqual([DEFAULT_DECISION_PREFIX]);
+		});
+
+		test("normalizes trailing dashes from prefixes", () => {
+			const config = { prefixes: { task: "back", decisionPrefixes: ["ADR-", "DSC-"] } } as BacklogConfig;
+			expect(getDecisionPrefixes(config)).toEqual(["ADR", "DSC"]);
+		});
+
+		test("returns default when no decisionPrefixes key", () => {
+			const config = { prefixes: { task: "back" } } as BacklogConfig;
+			expect(getDecisionPrefixes(config)).toEqual([DEFAULT_DECISION_PREFIX]);
 		});
 	});
 });

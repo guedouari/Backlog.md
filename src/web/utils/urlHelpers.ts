@@ -27,7 +27,8 @@ export function sanitizeUrlTitle(title: string): string {
  */
 export function createUrlPath(basePath: string, id: string, title: string): string {
 	const sanitizedTitle = sanitizeUrlTitle(title);
-	// Remove prefix from ID for cleaner URLs
-	const cleanId = id.replace(/^(doc-|decision-)/, "");
+	// Only strip the doc- prefix for document URLs; decision IDs keep their full prefix
+	// to avoid ambiguity between different decision types (decision-3, adr-3, etc.)
+	const cleanId = id.replace(/^doc-/, "");
 	return `${basePath}/${cleanId}/${sanitizedTitle}`;
 }

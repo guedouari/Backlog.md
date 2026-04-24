@@ -13,11 +13,73 @@ export const DEFAULT_PREFIX_CONFIG: PrefixConfig = {
 export const DRAFT_PREFIX = "draft";
 
 /**
+ * Default decision prefix when none is configured.
+ */
+export const DEFAULT_DECISION_PREFIX = "decision";
+
+/**
  * Returns the default prefix configuration.
  * Use this when no custom config is specified.
  */
 export function getDefaultPrefixConfig(): PrefixConfig {
 	return { ...DEFAULT_PREFIX_CONFIG };
+}
+
+/**
+ * Normalizes a prefix string by removing any trailing dashes and trimming whitespace.
+ *
+ * @param prefix - The raw prefix value (e.g., "BACK-", "epic")
+ * @returns Normalized prefix without trailing dashes (e.g., "BACK", "epic")
+ *
+ * @example
+ * normalizePrefix("BACK-") // => "BACK"
+ * normalizePrefix("epic")  // => "epic"
+ */
+export function normalizePrefix(prefix: string): string {
+	return prefix.trim().replace(/-+$/, "");
+}
+
+/**
+ * Returns all active task-category prefixes from config.
+ * Always includes the primary task prefix; optionally includes epic and feat.
+ *
+ * @param config - Optional backlog config
+ * @returns Array of active task prefixes (lowercase)
+ *
+ * @example
+ * getTaskPrefixes()                                    // => ["task"]
+ * getTaskPrefixes({ prefixes: { task: "back" } })     // => ["back"]
+ * getTaskPrefixes({ prefixes: { task: "back", epic: "epic", feat: "feat" } }) // => ["back", "epic", "feat"]
+ */
+export function getTaskPrefixes(config?: BacklogConfig): string[] {
+	const primary = normalizePrefix(config?.prefixes?.task ?? DEFAULT_PREFIX_CONFIG.task);
+	const prefixes: string[] = [primary];
+	if (config?.prefixes?.epic) {
+		prefixes.push(normalizePrefix(config.prefixes.epic));
+	}
+	if (config?.prefixes?.feat) {
+		prefixes.push(normalizePrefix(config.prefixes.feat));
+	}
+	return prefixes;
+}
+
+/**
+ * Returns all active decision-category prefixes from config.
+ * Falls back to ["decision"] when none are configured.
+ *
+ * @param config - Optional backlog config
+ * @returns Array of active decision prefixes
+ *
+ * @example
+ * getDecisionPrefixes()                                                     // => ["decision"]
+ * getDecisionPrefixes({ prefixes: { task: "back", decisionPrefixes: ["adr", "dsc"] } }) // => ["adr", "dsc"]
+ */
+export function getDecisionPrefixes(config?: BacklogConfig): string[] {
+	const configured = config?.prefixes?.decisionPrefixes;
+	if (Array.isArray(configured) && configured.length > 0) {
+		return configured.map(normalizePrefix);
+	}
+	return [DEFAULT_DECISION_PREFIX];
 }
 
 /**
@@ -30,6 +92,9 @@ export function getDefaultPrefixConfig(): PrefixConfig {
 export function mergePrefixConfig(config?: Partial<PrefixConfig>): PrefixConfig {
 	return {
 		task: config?.task ?? DEFAULT_PREFIX_CONFIG.task,
+		...(config?.epic !== undefined ? { epic: config.epic } : {}),
+		...(config?.feat !== undefined ? { feat: config.feat } : {}),
+		...(config?.decisionPrefixes !== undefined ? { decisionPrefixes: config.decisionPrefixes } : {}),
 	};
 }
 

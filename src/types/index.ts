@@ -105,6 +105,8 @@ export interface TaskCreateInput {
 	definitionOfDoneAdd?: string[];
 	disableDefinitionOfDoneDefaults?: boolean;
 	rawContent?: string;
+	/** Override the ID prefix for this task (e.g. "epic", "feat"). Defaults to config task prefix. */
+	prefix?: string;
 }
 
 export interface TaskUpdateInput {
@@ -245,13 +247,22 @@ export interface Sequence {
 }
 
 /**
- * Configuration for ID prefixes used in task files.
+ * Configuration for ID prefixes used in task and decision files.
  * Allows customization of task prefix (e.g., "JIRA-", "issue-", "bug-").
  * Note: Draft prefix is always "draft" and not configurable.
  */
 export interface PrefixConfig {
 	/** Prefix for task IDs (default: "task") - produces IDs like TASK-1, TASK-2 */
 	task: string;
+	/** Optional prefix for epic-category tasks (e.g., "epic" → EPIC-1, EPIC-2) */
+	epic?: string;
+	/** Optional prefix for feature-category tasks (e.g., "feat" → FEAT-1, FEAT-2) */
+	feat?: string;
+	/**
+	 * List of prefixes for decision files (default: ["decision"]).
+	 * Supports additional decision categories like "adr", "dsc", "apr".
+	 */
+	decisionPrefixes?: string[];
 }
 
 export interface BacklogConfig {
