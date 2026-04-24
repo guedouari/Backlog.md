@@ -41,26 +41,31 @@ export function normalizePrefix(prefix: string): string {
 
 /**
  * Returns all active task-category prefixes from config.
- * Always includes the primary task prefix; optionally includes epic and feat.
+ * Always includes the primary task prefix; appends any extras from taskPrefixes.
+ * Deduplicates so the primary is never listed twice.
  *
  * @param config - Optional backlog config
- * @returns Array of active task prefixes (lowercase)
+ * @returns Deduplicated array of active task prefixes
  *
  * @example
- * getTaskPrefixes()                                    // => ["task"]
- * getTaskPrefixes({ prefixes: { task: "back" } })     // => ["back"]
- * getTaskPrefixes({ prefixes: { task: "back", epic: "epic", feat: "feat" } }) // => ["back", "epic", "feat"]
+ * getTaskPrefixes()                                              // => ["task"]
+ * getTaskPrefixes({ prefixes: { task: "back" } })               // => ["back"]
+ * getTaskPrefixes({ prefixes: { task: "back",
+ *   taskPrefixes: ["epic", "feat", "bug"] } })                  // => ["back", "epic", "feat", "bug"]
  */
 export function getTaskPrefixes(config?: BacklogConfig): string[] {
 	const primary = normalizePrefix(config?.prefixes?.task ?? DEFAULT_PREFIX_CONFIG.task);
-	const prefixes: string[] = [primary];
-	if (config?.prefixes?.epic) {
-		prefixes.push(normalizePrefix(config.prefixes.epic));
+	const extras = config?.prefixes?.taskPrefixes ?? [];
+	const seen = new Set<string>([primary.toLowerCase()]);
+	const result: string[] = [primary];
+	for (const p of extras) {
+		const norm = normalizePrefix(p);
+		if (norm && !seen.has(norm.toLowerCase())) {
+			seen.add(norm.toLowerCase());
+			result.push(norm);
+		}
 	}
-	if (config?.prefixes?.feat) {
-		prefixes.push(normalizePrefix(config.prefixes.feat));
-	}
-	return prefixes;
+	return result;
 }
 
 /**
@@ -92,8 +97,7 @@ export function getDecisionPrefixes(config?: BacklogConfig): string[] {
 export function mergePrefixConfig(config?: Partial<PrefixConfig>): PrefixConfig {
 	return {
 		task: config?.task ?? DEFAULT_PREFIX_CONFIG.task,
-		...(config?.epic !== undefined ? { epic: config.epic } : {}),
-		...(config?.feat !== undefined ? { feat: config.feat } : {}),
+		...(config?.taskPrefixes !== undefined ? { taskPrefixes: config.taskPrefixes } : {}),
 		...(config?.decisionPrefixes !== undefined ? { decisionPrefixes: config.decisionPrefixes } : {}),
 	};
 }

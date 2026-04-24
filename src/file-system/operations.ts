@@ -1438,11 +1438,15 @@ ${description || `Milestone: ${title}`}`,
 				case "task_prefix":
 					config.prefixes = { ...(config.prefixes ?? { task: "task" }), task: value.replace(/['"]/g, "") };
 					break;
-				case "epic_prefix":
-					config.prefixes = { ...(config.prefixes ?? { task: "task" }), epic: value.replace(/['"]/g, "") };
-					break;
-				case "feat_prefix":
-					config.prefixes = { ...(config.prefixes ?? { task: "task" }), feat: value.replace(/['"]/g, "") };
+				case "task_prefixes":
+					if (value.startsWith("[") && value.endsWith("]")) {
+						const arrayContent = value.slice(1, -1);
+						const parsed = arrayContent
+							.split(",")
+							.map((item) => item.trim().replace(/['"]/g, ""))
+							.filter(Boolean);
+						config.prefixes = { ...(config.prefixes ?? { task: "task" }), taskPrefixes: parsed };
+					}
 					break;
 				case "decision_prefixes":
 					if (value.startsWith("[") && value.endsWith("]")) {
@@ -1513,8 +1517,9 @@ ${description || `Milestone: ${title}`}`,
 			...(typeof config.activeBranchDays === "number" ? [`active_branch_days: ${config.activeBranchDays}`] : []),
 			...(config.onStatusChange ? [`onStatusChange: '${config.onStatusChange}'`] : []),
 			...(config.prefixes?.task ? [`task_prefix: "${config.prefixes.task}"`] : []),
-			...(config.prefixes?.epic ? [`epic_prefix: "${config.prefixes.epic}"`] : []),
-			...(config.prefixes?.feat ? [`feat_prefix: "${config.prefixes.feat}"`] : []),
+			...(Array.isArray(config.prefixes?.taskPrefixes) && config.prefixes.taskPrefixes.length > 0
+				? [`task_prefixes: [${config.prefixes.taskPrefixes.map((p) => `"${p}"`).join(", ")}]`]
+				: []),
 			...(Array.isArray(config.prefixes?.decisionPrefixes) && config.prefixes.decisionPrefixes.length > 0
 				? [`decision_prefixes: [${config.prefixes.decisionPrefixes.map((p) => `"${p}"`).join(", ")}]`]
 				: []),

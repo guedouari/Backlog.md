@@ -252,12 +252,14 @@ export interface Sequence {
  * Note: Draft prefix is always "draft" and not configurable.
  */
 export interface PrefixConfig {
-	/** Prefix for task IDs (default: "task") - produces IDs like TASK-1, TASK-2 */
+	/** Primary prefix for task IDs (default: "task") - produces IDs like TASK-1, TASK-2 */
 	task: string;
-	/** Optional prefix for epic-category tasks (e.g., "epic" → EPIC-1, EPIC-2) */
-	epic?: string;
-	/** Optional prefix for feature-category tasks (e.g., "feat" → FEAT-1, FEAT-2) */
-	feat?: string;
+	/**
+	 * Additional task-category prefixes beyond the primary one.
+	 * Enables any custom prefix (e.g. ["epic", "feat", "bug", "fix"]).
+	 * All prefixes in this list are scanned alongside the primary prefix.
+	 */
+	taskPrefixes?: string[];
 	/**
 	 * List of prefixes for decision files (default: ["decision"]).
 	 * Supports additional decision categories like "adr", "dsc", "apr".

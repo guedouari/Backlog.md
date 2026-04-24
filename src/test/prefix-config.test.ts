@@ -58,15 +58,10 @@ describe("prefix-config", () => {
 			expect(config.task).toBe("issue");
 		});
 
-		test("includes epic when provided", () => {
-			const config = mergePrefixConfig({ task: "back", epic: "epic" });
+		test("includes taskPrefixes when provided", () => {
+			const config = mergePrefixConfig({ task: "back", taskPrefixes: ["epic", "feat"] });
 			expect(config.task).toBe("back");
-			expect(config.epic).toBe("epic");
-		});
-
-		test("includes feat when provided", () => {
-			const config = mergePrefixConfig({ task: "back", feat: "feat" });
-			expect(config.feat).toBe("feat");
+			expect(config.taskPrefixes).toEqual(["epic", "feat"]);
 		});
 
 		test("includes decisionPrefixes when provided", () => {
@@ -74,10 +69,9 @@ describe("prefix-config", () => {
 			expect(config.decisionPrefixes).toEqual(["adr", "dsc"]);
 		});
 
-		test("omits epic/feat/decisionPrefixes when not provided", () => {
+		test("omits taskPrefixes/decisionPrefixes when not provided", () => {
 			const config = mergePrefixConfig({ task: "back" });
-			expect(config.epic).toBeUndefined();
-			expect(config.feat).toBeUndefined();
+			expect(config.taskPrefixes).toBeUndefined();
 			expect(config.decisionPrefixes).toBeUndefined();
 		});
 	});
@@ -421,24 +415,29 @@ describe("prefix-config", () => {
 			expect(getTaskPrefixes(config)).toEqual(["back"]);
 		});
 
-		test("includes epic prefix when configured", () => {
-			const config = { prefixes: { task: "back", epic: "epic" } } as BacklogConfig;
-			expect(getTaskPrefixes(config)).toEqual(["back", "epic"]);
-		});
-
-		test("includes feat prefix when configured", () => {
-			const config = { prefixes: { task: "back", feat: "feat" } } as BacklogConfig;
-			expect(getTaskPrefixes(config)).toEqual(["back", "feat"]);
-		});
-
-		test("includes all three prefixes when all configured", () => {
-			const config = { prefixes: { task: "back", epic: "epic", feat: "feat" } } as BacklogConfig;
+		test("includes taskPrefixes extras when configured", () => {
+			const config = { prefixes: { task: "back", taskPrefixes: ["epic", "feat"] } } as BacklogConfig;
 			expect(getTaskPrefixes(config)).toEqual(["back", "epic", "feat"]);
 		});
 
+		test("any extra prefix can be added (bug, fix, hotfix, etc.)", () => {
+			const config = { prefixes: { task: "back", taskPrefixes: ["bug", "fix", "hotfix"] } } as BacklogConfig;
+			expect(getTaskPrefixes(config)).toEqual(["back", "bug", "fix", "hotfix"]);
+		});
+
+		test("deduplicates primary prefix if also in taskPrefixes", () => {
+			const config = { prefixes: { task: "back", taskPrefixes: ["back", "epic"] } } as BacklogConfig;
+			expect(getTaskPrefixes(config)).toEqual(["back", "epic"]);
+		});
+
 		test("normalizes trailing dashes from prefixes", () => {
-			const config = { prefixes: { task: "BACK-", epic: "EPIC-" } } as BacklogConfig;
+			const config = { prefixes: { task: "BACK-", taskPrefixes: ["EPIC-"] } } as BacklogConfig;
 			expect(getTaskPrefixes(config)).toEqual(["BACK", "EPIC"]);
+		});
+
+		test("ignores empty strings in taskPrefixes", () => {
+			const config = { prefixes: { task: "back", taskPrefixes: ["", "epic", ""] } } as BacklogConfig;
+			expect(getTaskPrefixes(config)).toEqual(["back", "epic"]);
 		});
 	});
 

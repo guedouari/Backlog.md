@@ -3533,8 +3533,9 @@ configCmd
 			console.log(`  bypassGitHooks: ${config.bypassGitHooks ?? "(not set)"}`);
 			console.log(`  zeroPaddedIds: ${config.zeroPaddedIds ?? "(disabled)"}`);
 			console.log(`  taskPrefix: ${config.prefixes?.task || "task"} (read-only)`);
-			console.log(`  epicPrefix: ${config.prefixes?.epic || "(not set)"} (read-only)`);
-			console.log(`  featPrefix: ${config.prefixes?.feat || "(not set)"} (read-only)`);
+			console.log(
+				`  taskPrefixes: [${(config.prefixes?.taskPrefixes ?? []).join(", ")}] (read-only, extras beyond taskPrefix)`,
+			);
 			console.log(`  decisionPrefixes: [${(config.prefixes?.decisionPrefixes ?? ["decision"]).join(", ")}] (read-only)`);
 			console.log(`  checkActiveBranches: ${config.checkActiveBranches ?? "true"}`);
 			console.log(`  activeBranchDays: ${config.activeBranchDays ?? "30"}`);

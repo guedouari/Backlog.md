@@ -1,11 +1,11 @@
 ---
 id: BACK-414
 title: Support multiple file category prefixes for tasks and decisions
-status: To Do
+status: Done
 assignee:
   - '@copilot'
 created_date: '2026-04-24 15:37'
-updated_date: '2026-04-24 15:38'
+updated_date: '2026-04-24 16:03'
 labels: []
 dependencies: []
 ---
