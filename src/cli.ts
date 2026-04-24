@@ -52,7 +52,7 @@ import { type AgentSelectionValue, processAgentSelection } from "./utils/agent-s
 import { normalizeProjectBacklogDirectory } from "./utils/backlog-directory.ts";
 import { findBacklogRoot } from "./utils/find-backlog-root.ts";
 import { createMilestoneFilterValueResolver, resolveClosestMilestoneFilterValue } from "./utils/milestone-filter.ts";
-import { getDocPrefix, hasAnyPrefix } from "./utils/prefix-config.ts";
+import { getDocPrefix, getDocPrefixes, hasAnyPrefix } from "./utils/prefix-config.ts";
 import { type RuntimeCwdResolution, resolveRuntimeCwd } from "./utils/runtime-cwd.ts";
 import { formatValidStatuses, getCanonicalStatus, getValidStatuses } from "./utils/status.ts";
 import {
@@ -3487,6 +3487,52 @@ configCmd
 					);
 					process.exit(1);
 					break;
+				case "doc_prefix":
+				case "docPrefix": {
+					const normalized = value.replace(/['"]/g, "").trim();
+					if (!normalized || !/^[a-zA-Z][a-zA-Z0-9]*$/.test(normalized)) {
+						console.error("doc_prefix must be an alphanumeric string (e.g. 'doc', 'wiki')");
+						process.exit(1);
+					}
+					config.prefixes = { ...(config.prefixes ?? { task: "task" }), doc: normalized };
+					break;
+				}
+				case "doc_prefixes":
+				case "docPrefixes": {
+					const raw = value.trim();
+					const items = raw.startsWith("[") && raw.endsWith("]")
+						? raw.slice(1, -1).split(",").map((s) => s.trim().replace(/['"]/g, "")).filter(Boolean)
+						: raw.split(",").map((s) => s.trim().replace(/['"]/g, "")).filter(Boolean);
+					if (items.length === 0 || items.some((p) => !/^[a-zA-Z][a-zA-Z0-9]*$/.test(p))) {
+						console.error("doc_prefixes must be a comma-separated list of alphanumeric prefixes (e.g. 'doc,wiki,spec')");
+						process.exit(1);
+					}
+					config.prefixes = { ...(config.prefixes ?? { task: "task" }), docPrefixes: items };
+					break;
+				}
+				case "milestone_prefix":
+				case "milestonePrefix": {
+					const normalized = value.replace(/['"]/g, "").trim();
+					if (!normalized || !/^[a-zA-Z][a-zA-Z0-9]*$/.test(normalized)) {
+						console.error("milestone_prefix must be an alphanumeric string (e.g. 'm', 'sprint')");
+						process.exit(1);
+					}
+					config.prefixes = { ...(config.prefixes ?? { task: "task" }), milestone: normalized };
+					break;
+				}
+				case "milestone_prefixes":
+				case "milestonePrefixes": {
+					const raw = value.trim();
+					const items = raw.startsWith("[") && raw.endsWith("]")
+						? raw.slice(1, -1).split(",").map((s) => s.trim().replace(/['"]/g, "")).filter(Boolean)
+						: raw.split(",").map((s) => s.trim().replace(/['"]/g, "")).filter(Boolean);
+					if (items.length === 0 || items.some((p) => !/^[a-zA-Z][a-zA-Z0-9]*$/.test(p))) {
+						console.error("milestone_prefixes must be a comma-separated list of alphanumeric prefixes (e.g. 'm,sprint,release')");
+						process.exit(1);
+					}
+					config.prefixes = { ...(config.prefixes ?? { task: "task" }), milestonePrefixes: items };
+					break;
+				}
 				default:
 					console.error(`Unknown config key: ${key}`);
 					console.error(
@@ -3538,8 +3584,16 @@ configCmd
 			console.log(
 				`  taskPrefixes: [${(config.prefixes?.taskPrefixes ?? []).join(", ")}] (read-only, extras beyond taskPrefix)`,
 			);
-			console.log(`  docPrefix: ${config.prefixes?.doc || "doc"} (read-only)`);
-			console.log(`  milestonePrefix: ${config.prefixes?.milestone || "m"} (read-only)`);
+			if (config.prefixes?.docPrefixes && config.prefixes.docPrefixes.length > 0) {
+				console.log(`  docPrefixes: [${config.prefixes.docPrefixes.join(", ")}] (read-only)`);
+			} else {
+				console.log(`  docPrefix: ${config.prefixes?.doc || "doc"} (read-only)`);
+			}
+			if (config.prefixes?.milestonePrefixes && config.prefixes.milestonePrefixes.length > 0) {
+				console.log(`  milestonePrefixes: [${config.prefixes.milestonePrefixes.join(", ")}] (read-only)`);
+			} else {
+				console.log(`  milestonePrefix: ${config.prefixes?.milestone || "m"} (read-only)`);
+			}
 			console.log(`  decisionPrefixes: [${(config.prefixes?.decisionPrefixes ?? ["decision"]).join(", ")}] (read-only)`);
 			console.log(`  checkActiveBranches: ${config.checkActiveBranches ?? "true"}`);
 			console.log(`  activeBranchDays: ${config.activeBranchDays ?? "30"}`);

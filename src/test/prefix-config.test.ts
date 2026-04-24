@@ -16,7 +16,9 @@ import {
 	getDecisionPrefixes,
 	getDefaultPrefixConfig,
 	getDocPrefix,
+	getDocPrefixes,
 	getMilestonePrefix,
+	getMilestonePrefixes,
 	getPrefixForType,
 	getTaskPrefixes,
 	hasPrefix,
@@ -73,9 +75,19 @@ describe("prefix-config", () => {
 			expect(config.doc).toBe("wiki");
 		});
 
+		test("includes docPrefixes array when provided", () => {
+			const config = mergePrefixConfig({ docPrefixes: ["wiki", "spec"] });
+			expect(config.docPrefixes).toEqual(["wiki", "spec"]);
+		});
+
 		test("includes milestone prefix when provided", () => {
 			const config = mergePrefixConfig({ milestone: "v" });
 			expect(config.milestone).toBe("v");
+		});
+
+		test("includes milestonePrefixes array when provided", () => {
+			const config = mergePrefixConfig({ milestonePrefixes: ["sprint", "release"] });
+			expect(config.milestonePrefixes).toEqual(["sprint", "release"]);
 		});
 
 		test("includes decisionPrefixes when provided", () => {
@@ -87,7 +99,9 @@ describe("prefix-config", () => {
 			const config = mergePrefixConfig({ task: "back" });
 			expect(config.taskPrefixes).toBeUndefined();
 			expect(config.doc).toBeUndefined();
+			expect(config.docPrefixes).toBeUndefined();
 			expect(config.milestone).toBeUndefined();
+			expect(config.milestonePrefixes).toBeUndefined();
 			expect(config.decisionPrefixes).toBeUndefined();
 		});
 	});
@@ -387,6 +401,52 @@ describe("prefix-config", () => {
 			const config = { prefixes: { task: "back" } } as BacklogConfig;
 			expect(getDocPrefix(config)).toBe("doc");
 		});
+
+		test("returns first entry of docPrefixes when set", () => {
+			const config = { prefixes: { task: "back", docPrefixes: ["wiki", "spec"] } } as BacklogConfig;
+			expect(getDocPrefix(config)).toBe("wiki");
+		});
+
+		test("docPrefixes takes precedence over doc", () => {
+			const config = { prefixes: { task: "back", doc: "old", docPrefixes: ["wiki", "spec"] } } as BacklogConfig;
+			expect(getDocPrefix(config)).toBe("wiki");
+		});
+	});
+
+	describe("getDocPrefixes", () => {
+		test("returns default array when no config", () => {
+			expect(getDocPrefixes()).toEqual(["doc"]);
+		});
+
+		test("returns single-element array for legacy doc config", () => {
+			const config = { prefixes: { task: "back", doc: "wiki" } } as BacklogConfig;
+			expect(getDocPrefixes(config)).toEqual(["wiki"]);
+		});
+
+		test("returns full docPrefixes array when set", () => {
+			const config = { prefixes: { task: "back", docPrefixes: ["wiki", "spec", "guide"] } } as BacklogConfig;
+			expect(getDocPrefixes(config)).toEqual(["wiki", "spec", "guide"]);
+		});
+
+		test("docPrefixes takes precedence over doc", () => {
+			const config = { prefixes: { task: "back", doc: "old", docPrefixes: ["wiki", "spec"] } } as BacklogConfig;
+			expect(getDocPrefixes(config)).toEqual(["wiki", "spec"]);
+		});
+
+		test("normalizes trailing dashes in each prefix", () => {
+			const config = { prefixes: { task: "back", docPrefixes: ["wiki-", "spec-"] } } as BacklogConfig;
+			expect(getDocPrefixes(config)).toEqual(["wiki", "spec"]);
+		});
+
+		test("ignores empty entries in docPrefixes", () => {
+			const config = { prefixes: { task: "back", docPrefixes: ["wiki", "", "spec"] } } as BacklogConfig;
+			expect(getDocPrefixes(config)).toEqual(["wiki", "spec"]);
+		});
+
+		test("falls back to default when docPrefixes is empty array", () => {
+			const config = { prefixes: { task: "back", docPrefixes: [] } } as BacklogConfig;
+			expect(getDocPrefixes(config)).toEqual(["doc"]);
+		});
 	});
 
 	describe("getMilestonePrefix", () => {
@@ -407,6 +467,52 @@ describe("prefix-config", () => {
 		test("returns default when milestone key absent", () => {
 			const config = { prefixes: { task: "back" } } as BacklogConfig;
 			expect(getMilestonePrefix(config)).toBe("m");
+		});
+
+		test("returns first entry of milestonePrefixes when set", () => {
+			const config = { prefixes: { task: "back", milestonePrefixes: ["sprint", "release"] } } as BacklogConfig;
+			expect(getMilestonePrefix(config)).toBe("sprint");
+		});
+
+		test("milestonePrefixes takes precedence over milestone", () => {
+			const config = { prefixes: { task: "back", milestone: "old", milestonePrefixes: ["sprint", "release"] } } as BacklogConfig;
+			expect(getMilestonePrefix(config)).toBe("sprint");
+		});
+	});
+
+	describe("getMilestonePrefixes", () => {
+		test("returns default array when no config", () => {
+			expect(getMilestonePrefixes()).toEqual(["m"]);
+		});
+
+		test("returns single-element array for legacy milestone config", () => {
+			const config = { prefixes: { task: "back", milestone: "v" } } as BacklogConfig;
+			expect(getMilestonePrefixes(config)).toEqual(["v"]);
+		});
+
+		test("returns full milestonePrefixes array when set", () => {
+			const config = { prefixes: { task: "back", milestonePrefixes: ["sprint", "release", "m"] } } as BacklogConfig;
+			expect(getMilestonePrefixes(config)).toEqual(["sprint", "release", "m"]);
+		});
+
+		test("milestonePrefixes takes precedence over milestone", () => {
+			const config = { prefixes: { task: "back", milestone: "old", milestonePrefixes: ["sprint", "release"] } } as BacklogConfig;
+			expect(getMilestonePrefixes(config)).toEqual(["sprint", "release"]);
+		});
+
+		test("normalizes trailing dashes in each prefix", () => {
+			const config = { prefixes: { task: "back", milestonePrefixes: ["sprint-", "release-"] } } as BacklogConfig;
+			expect(getMilestonePrefixes(config)).toEqual(["sprint", "release"]);
+		});
+
+		test("ignores empty entries in milestonePrefixes", () => {
+			const config = { prefixes: { task: "back", milestonePrefixes: ["sprint", "", "release"] } } as BacklogConfig;
+			expect(getMilestonePrefixes(config)).toEqual(["sprint", "release"]);
+		});
+
+		test("falls back to default when milestonePrefixes is empty array", () => {
+			const config = { prefixes: { task: "back", milestonePrefixes: [] } } as BacklogConfig;
+			expect(getMilestonePrefixes(config)).toEqual(["m"]);
 		});
 	});
 

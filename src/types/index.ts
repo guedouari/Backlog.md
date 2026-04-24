@@ -260,10 +260,28 @@ export interface PrefixConfig {
 	 * All prefixes in this list are scanned alongside the primary prefix.
 	 */
 	taskPrefixes?: string[];
-	/** Prefix for document IDs (default: "doc") - produces IDs like doc-1, doc-2 */
+	/**
+	 * Single document prefix (default: "doc"). Overridden by docPrefixes when set.
+	 * @deprecated Use docPrefixes for multi-prefix support.
+	 */
 	doc?: string;
-	/** Prefix for milestone IDs (default: "m") - produces IDs like m-0, m-1 */
+	/**
+	 * List of prefixes for document files (default: ["doc"]).
+	 * Supports additional document categories like "wiki", "spec".
+	 * First entry is used when creating new documents.
+	 */
+	docPrefixes?: string[];
+	/**
+	 * Single milestone prefix (default: "m"). Overridden by milestonePrefixes when set.
+	 * @deprecated Use milestonePrefixes for multi-prefix support.
+	 */
 	milestone?: string;
+	/**
+	 * List of prefixes for milestone files (default: ["m"]).
+	 * Supports additional milestone categories like "sprint", "release".
+	 * First entry is used when creating new milestones.
+	 */
+	milestonePrefixes?: string[];
 	/**
 	 * List of prefixes for decision files (default: ["decision"]).
 	 * Supports additional decision categories like "adr", "dsc", "apr".

@@ -98,7 +98,29 @@ export function getDecisionPrefixes(config?: BacklogConfig): string[] {
 }
 
 /**
+ * Returns all active document prefixes from config.
+ * When docPrefixes is set, uses that array (first = default for new docs).
+ * Falls back to doc (single prefix) then DEFAULT_DOC_PREFIX.
+ *
+ * @param config - Optional backlog config
+ * @returns Array of active document prefixes (never empty)
+ *
+ * @example
+ * getDocPrefixes()                                                      // => ["doc"]
+ * getDocPrefixes({ prefixes: { task: "back", doc: "wiki" } })           // => ["wiki"]
+ * getDocPrefixes({ prefixes: { task: "back", docPrefixes: ["wiki","spec"] } }) // => ["wiki","spec"]
+ */
+export function getDocPrefixes(config?: BacklogConfig): string[] {
+	const configured = config?.prefixes?.docPrefixes;
+	if (Array.isArray(configured) && configured.length > 0) {
+		return configured.map(normalizePrefix).filter(Boolean);
+	}
+	return [normalizePrefix(config?.prefixes?.doc ?? DEFAULT_DOC_PREFIX)];
+}
+
+/**
  * Returns the configured document prefix (default: "doc").
+ * This is the first entry of getDocPrefixes() and is used when creating new documents.
  *
  * @param config - Optional backlog config
  * @returns Normalized document prefix
@@ -108,11 +130,33 @@ export function getDecisionPrefixes(config?: BacklogConfig): string[] {
  * getDocPrefix({ prefixes: { task: "back", doc: "wiki" } }) // => "wiki"
  */
 export function getDocPrefix(config?: BacklogConfig): string {
-	return normalizePrefix(config?.prefixes?.doc ?? DEFAULT_DOC_PREFIX);
+	return getDocPrefixes(config)[0] ?? DEFAULT_DOC_PREFIX;
+}
+
+/**
+ * Returns all active milestone prefixes from config.
+ * When milestonePrefixes is set, uses that array (first = default for new milestones).
+ * Falls back to milestone (single prefix) then DEFAULT_MILESTONE_PREFIX.
+ *
+ * @param config - Optional backlog config
+ * @returns Array of active milestone prefixes (never empty)
+ *
+ * @example
+ * getMilestonePrefixes()                                                          // => ["m"]
+ * getMilestonePrefixes({ prefixes: { task: "back", milestone: "v" } })            // => ["v"]
+ * getMilestonePrefixes({ prefixes: { task: "back", milestonePrefixes: ["sprint","release"] } }) // => ["sprint","release"]
+ */
+export function getMilestonePrefixes(config?: BacklogConfig): string[] {
+	const configured = config?.prefixes?.milestonePrefixes;
+	if (Array.isArray(configured) && configured.length > 0) {
+		return configured.map(normalizePrefix).filter(Boolean);
+	}
+	return [normalizePrefix(config?.prefixes?.milestone ?? DEFAULT_MILESTONE_PREFIX)];
 }
 
 /**
  * Returns the configured milestone prefix (default: "m").
+ * This is the first entry of getMilestonePrefixes() and is used when creating new milestones.
  *
  * @param config - Optional backlog config
  * @returns Normalized milestone prefix
@@ -122,7 +166,7 @@ export function getDocPrefix(config?: BacklogConfig): string {
  * getMilestonePrefix({ prefixes: { task: "back", milestone: "v" } }) // => "v"
  */
 export function getMilestonePrefix(config?: BacklogConfig): string {
-	return normalizePrefix(config?.prefixes?.milestone ?? DEFAULT_MILESTONE_PREFIX);
+	return getMilestonePrefixes(config)[0] ?? DEFAULT_MILESTONE_PREFIX;
 }
 
 /**
@@ -137,7 +181,9 @@ export function mergePrefixConfig(config?: Partial<PrefixConfig>): PrefixConfig 
 		task: config?.task ?? DEFAULT_PREFIX_CONFIG.task,
 		...(config?.taskPrefixes !== undefined ? { taskPrefixes: config.taskPrefixes } : {}),
 		...(config?.doc !== undefined ? { doc: config.doc } : {}),
+		...(config?.docPrefixes !== undefined ? { docPrefixes: config.docPrefixes } : {}),
 		...(config?.milestone !== undefined ? { milestone: config.milestone } : {}),
+		...(config?.milestonePrefixes !== undefined ? { milestonePrefixes: config.milestonePrefixes } : {}),
 		...(config?.decisionPrefixes !== undefined ? { decisionPrefixes: config.decisionPrefixes } : {}),
 	};
 }

@@ -39,8 +39,10 @@ Running `backlog config` with no arguments launches the interactive advanced wiz
 | `task_prefix`     | Default prefix for new tasks (single prefix, overridden by `task_prefixes`) | `back` |
 | `task_prefixes`   | Allowed task prefixes — first entry is used for new tasks | `[back]` |
 | `decision_prefixes` | Allowed decision prefixes — first entry is used for new decisions | `[decision]` |
-| `doc_prefix`      | Prefix for new documents | `doc` |
-| `milestone_prefix`| Prefix for new milestones | `m` |
+| `doc_prefix`      | Prefix for new documents (single, overridden by `doc_prefixes`) | `doc` |
+| `doc_prefixes`    | Allowed document prefixes — first entry is used for new documents | `(not set)` |
+| `milestone_prefix`| Prefix for new milestones (single, overridden by `milestone_prefixes`) | `m` |
+| `milestone_prefixes` | Allowed milestone prefixes — first entry is used for new milestones | `(not set)` |
 
 ## Detailed Notes
 
@@ -58,7 +60,7 @@ Running `backlog config` with no arguments launches the interactive advanced wiz
 
 > **Date/Time Support**: Backlog.md now supports datetime precision for all dates. New items automatically include time (YYYY-MM-DD HH:mm format in UTC), while existing date-only entries remain unchanged for backward compatibility. Use the migration script `bun src/scripts/migrate-dates.ts` to optionally add time to existing items.
 
-> **Prefix Configuration**: All entity prefixes are user-configurable. Tasks support multiple prefixes (`task_prefixes: [back, epic, feat, bug]`) for visual categorisation — the first entry is used when creating new tasks. Decisions similarly support multiple prefixes (`decision_prefixes: [decision, adr, dsc]`). Documents and milestones use single prefixes (`doc_prefix: doc`, `milestone_prefix: m`). All defaults match the previous behaviour, so existing projects are unaffected unless you set these values explicitly. Example `.backlog/config.yml` snippet:
+> **Prefix Configuration**: All entity prefixes are user-configurable. Tasks support multiple prefixes (`task_prefixes: [back, epic, feat, bug]`) for visual categorisation — the first entry is used when creating new tasks. Decisions, documents, and milestones similarly support multiple prefixes for distinct categories, each with its own independent ID sequence (e.g. `doc-1`, `doc-2` and `wiki-1`, `wiki-2` are separate). `decision_prefixes`, `doc_prefixes`, and `milestone_prefixes` all accept arrays; single-value alternatives (`doc_prefix`, `milestone_prefix`) are supported for backward compatibility. All defaults match the previous behaviour, so existing projects are unaffected unless you set these values explicitly. Example `.backlog/config.yml` snippet:
 > ```yaml
 > task_prefixes:
 >   - back
@@ -68,6 +70,10 @@ Running `backlog config` with no arguments launches the interactive advanced wiz
 > decision_prefixes:
 >   - decision
 >   - adr
-> doc_prefix: doc
-> milestone_prefix: sprint
+> doc_prefixes:
+>   - doc
+>   - wiki
+> milestone_prefixes:
+>   - sprint
+>   - release
 > ```
