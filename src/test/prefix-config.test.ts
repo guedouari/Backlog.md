@@ -5,6 +5,8 @@ import {
 	buildGlobPattern,
 	buildIdRegex,
 	DEFAULT_DECISION_PREFIX,
+	DEFAULT_DOC_PREFIX,
+	DEFAULT_MILESTONE_PREFIX,
 	DEFAULT_PREFIX_CONFIG,
 	extractAnyPrefix,
 	extractIdBody,
@@ -13,6 +15,8 @@ import {
 	generateNextSubtaskId,
 	getDecisionPrefixes,
 	getDefaultPrefixConfig,
+	getDocPrefix,
+	getMilestonePrefix,
 	getPrefixForType,
 	getTaskPrefixes,
 	hasPrefix,
@@ -64,14 +68,26 @@ describe("prefix-config", () => {
 			expect(config.taskPrefixes).toEqual(["epic", "feat"]);
 		});
 
+		test("includes doc prefix when provided", () => {
+			const config = mergePrefixConfig({ doc: "wiki" });
+			expect(config.doc).toBe("wiki");
+		});
+
+		test("includes milestone prefix when provided", () => {
+			const config = mergePrefixConfig({ milestone: "v" });
+			expect(config.milestone).toBe("v");
+		});
+
 		test("includes decisionPrefixes when provided", () => {
 			const config = mergePrefixConfig({ decisionPrefixes: ["adr", "dsc"] });
 			expect(config.decisionPrefixes).toEqual(["adr", "dsc"]);
 		});
 
-		test("omits taskPrefixes/decisionPrefixes when not provided", () => {
+		test("omits optional fields when not provided", () => {
 			const config = mergePrefixConfig({ task: "back" });
 			expect(config.taskPrefixes).toBeUndefined();
+			expect(config.doc).toBeUndefined();
+			expect(config.milestone).toBeUndefined();
 			expect(config.decisionPrefixes).toBeUndefined();
 		});
 	});
@@ -342,8 +358,55 @@ describe("prefix-config", () => {
 			expect(getPrefixForType(EntityType.Document)).toBe("doc");
 		});
 
+		test("returns configured doc prefix for Document type", () => {
+			const config = { prefixes: { task: "back", doc: "wiki" } } as BacklogConfig;
+			expect(getPrefixForType(EntityType.Document, config)).toBe("wiki");
+		});
+
 		test("returns decision prefix for Decision type", () => {
 			expect(getPrefixForType(EntityType.Decision)).toBe("decision");
+		});
+	});
+
+	describe("getDocPrefix", () => {
+		test("returns default doc prefix when no config", () => {
+			expect(getDocPrefix()).toBe(DEFAULT_DOC_PREFIX);
+		});
+
+		test("returns configured doc prefix", () => {
+			const config = { prefixes: { task: "back", doc: "wiki" } } as BacklogConfig;
+			expect(getDocPrefix(config)).toBe("wiki");
+		});
+
+		test("normalizes trailing dashes", () => {
+			const config = { prefixes: { task: "back", doc: "guide-" } } as BacklogConfig;
+			expect(getDocPrefix(config)).toBe("guide");
+		});
+
+		test("returns default when doc key absent", () => {
+			const config = { prefixes: { task: "back" } } as BacklogConfig;
+			expect(getDocPrefix(config)).toBe("doc");
+		});
+	});
+
+	describe("getMilestonePrefix", () => {
+		test("returns default milestone prefix when no config", () => {
+			expect(getMilestonePrefix()).toBe(DEFAULT_MILESTONE_PREFIX);
+		});
+
+		test("returns configured milestone prefix", () => {
+			const config = { prefixes: { task: "back", milestone: "v" } } as BacklogConfig;
+			expect(getMilestonePrefix(config)).toBe("v");
+		});
+
+		test("normalizes trailing dashes", () => {
+			const config = { prefixes: { task: "back", milestone: "ms-" } } as BacklogConfig;
+			expect(getMilestonePrefix(config)).toBe("ms");
+		});
+
+		test("returns default when milestone key absent", () => {
+			const config = { prefixes: { task: "back" } } as BacklogConfig;
+			expect(getMilestonePrefix(config)).toBe("m");
 		});
 	});
 

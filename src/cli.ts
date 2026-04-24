@@ -52,7 +52,7 @@ import { type AgentSelectionValue, processAgentSelection } from "./utils/agent-s
 import { normalizeProjectBacklogDirectory } from "./utils/backlog-directory.ts";
 import { findBacklogRoot } from "./utils/find-backlog-root.ts";
 import { createMilestoneFilterValueResolver, resolveClosestMilestoneFilterValue } from "./utils/milestone-filter.ts";
-import { hasAnyPrefix } from "./utils/prefix-config.ts";
+import { getDocPrefix, hasAnyPrefix } from "./utils/prefix-config.ts";
 import { type RuntimeCwdResolution, resolveRuntimeCwd } from "./utils/runtime-cwd.ts";
 import { formatValidStatuses, getCanonicalStatus, getValidStatuses } from "./utils/status.ts";
 import {
@@ -1264,6 +1264,7 @@ program
 
 export async function generateNextDocId(core: Core): Promise<string> {
 	const config = await core.filesystem.loadConfig();
+	const docPrefix = getDocPrefix(config ?? undefined);
 	// Load local documents
 	const docs = await core.filesystem.listDocuments();
 	const allIds: string[] = [];
@@ -1287,8 +1288,8 @@ export async function generateNextDocId(core: Core): Promise<string> {
 			const files = await core.gitOps.listFilesInTree(branch, `${backlogDir}/docs`);
 			return files
 				.map((file) => {
-					const match = file.match(/doc-(\d+)/);
-					return match ? `doc-${match[1]}` : null;
+					const match = file.match(new RegExp(`${docPrefix}-(\\d+)`));
+					return match ? `${docPrefix}-${match[1]}` : null;
 				})
 				.filter((id): id is string => id !== null);
 		});
@@ -1312,7 +1313,7 @@ export async function generateNextDocId(core: Core): Promise<string> {
 	// Find the highest numeric ID
 	let max = 0;
 	for (const id of allIds) {
-		const match = id.match(/^doc-(\d+)$/);
+		const match = id.match(new RegExp(`^${docPrefix}-(\\d+)$`, "i"));
 		if (match) {
 			const num = Number.parseInt(match[1] || "0", 10);
 			if (num > max) max = num;
@@ -1324,10 +1325,10 @@ export async function generateNextDocId(core: Core): Promise<string> {
 
 	if (padding && typeof padding === "number" && padding > 0) {
 		const paddedId = String(nextIdNumber).padStart(padding, "0");
-		return `doc-${paddedId}`;
+		return `${docPrefix}-${paddedId}`;
 	}
 
-	return `doc-${nextIdNumber}`;
+	return `${docPrefix}-${nextIdNumber}`;
 }
 
 export async function generateNextDecisionId(core: Core, prefix = "decision"): Promise<string> {
@@ -2784,34 +2785,34 @@ async function handleBoardView(options: { layout?: string; vertical?: boolean; m
 					return "";
 				}
 				const key = normalized.toLowerCase();
-				const looksLikeMilestoneId = /^\d+$/.test(normalized) || /^m-\d+$/i.test(normalized);
-				const canonicalInputId = looksLikeMilestoneId
-					? `m-${String(Number.parseInt(normalized.replace(/^m-/i, ""), 10))}`
+				const idPrefixMatch = normalized.match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+				const canonicalInputId = idPrefixMatch?.[1] && idPrefixMatch?.[2]
+					? `${idPrefixMatch[1].toLowerCase()}-${String(Number.parseInt(idPrefixMatch[2], 10))}`
+					: /^\d+$/.test(normalized)
+					? null
 					: null;
 				const aliasKeys = new Set<string>([key]);
 				if (/^\d+$/.test(normalized)) {
 					const numericAlias = String(Number.parseInt(normalized, 10));
 					aliasKeys.add(numericAlias);
-					aliasKeys.add(`m-${numericAlias}`);
-				} else {
-					const idMatch = normalized.match(/^m-(\d+)$/i);
-					if (idMatch?.[1]) {
-						const numericAlias = String(Number.parseInt(idMatch[1], 10));
-						aliasKeys.add(numericAlias);
-						aliasKeys.add(`m-${numericAlias}`);
-					}
+				} else if (idPrefixMatch?.[1] && idPrefixMatch?.[2]) {
+					const prefix = idPrefixMatch[1].toLowerCase();
+					const numericAlias = String(Number.parseInt(idPrefixMatch[2], 10));
+					aliasKeys.add(numericAlias);
+					aliasKeys.add(`${prefix}-${numericAlias}`);
 				}
 				const idMatchesAlias = (milestoneId: string): boolean => {
 					const idKey = milestoneId.trim().toLowerCase();
 					if (aliasKeys.has(idKey)) {
 						return true;
 					}
-					const idMatch = milestoneId.trim().match(/^m-(\d+)$/i);
-					if (!idMatch?.[1]) {
+					const idMatch = milestoneId.trim().match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+					if (!idMatch?.[1] || !idMatch?.[2]) {
 						return false;
 					}
-					const numericAlias = String(Number.parseInt(idMatch[1], 10));
-					return aliasKeys.has(numericAlias) || aliasKeys.has(`m-${numericAlias}`);
+					const prefix = idMatch[1].toLowerCase();
+					const numericAlias = String(Number.parseInt(idMatch[2], 10));
+					return aliasKeys.has(numericAlias) || aliasKeys.has(`${prefix}-${numericAlias}`);
 				};
 				const findIdMatch = (milestones: Milestone[]): Milestone | undefined => {
 					const rawExactMatch = milestones.find((milestone) => milestone.id.trim().toLowerCase() === key);
@@ -2829,6 +2830,7 @@ async function handleBoardView(options: { layout?: string; vertical?: boolean; m
 					return milestones.find((milestone) => idMatchesAlias(milestone.id));
 				};
 
+				const looksLikeMilestoneId = /^\d+$/.test(normalized) || /^[a-zA-Z][a-zA-Z0-9]*-\d+$/i.test(normalized);
 				const activeIdMatch = findIdMatch(milestoneEntities);
 				if (activeIdMatch) {
 					return activeIdMatch.id;
@@ -3536,6 +3538,8 @@ configCmd
 			console.log(
 				`  taskPrefixes: [${(config.prefixes?.taskPrefixes ?? []).join(", ")}] (read-only, extras beyond taskPrefix)`,
 			);
+			console.log(`  docPrefix: ${config.prefixes?.doc || "doc"} (read-only)`);
+			console.log(`  milestonePrefix: ${config.prefixes?.milestone || "m"} (read-only)`);
 			console.log(`  decisionPrefixes: [${(config.prefixes?.decisionPrefixes ?? ["decision"]).join(", ")}] (read-only)`);
 			console.log(`  checkActiveBranches: ${config.checkActiveBranches ?? "true"}`);
 			console.log(`  activeBranchDays: ${config.activeBranchDays ?? "30"}`);

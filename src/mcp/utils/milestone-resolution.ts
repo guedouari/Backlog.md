@@ -25,14 +25,14 @@ function buildMilestoneLookupKeys(name: string): string[] {
 	if (/^\d+$/.test(normalized)) {
 		const numeric = String(Number.parseInt(normalized, 10));
 		addKey(numeric);
-		addKey(`m-${numeric}`);
 		return keys;
 	}
 
-	const milestoneIdMatch = normalized.match(/^m-(\d+)$/i);
-	if (milestoneIdMatch?.[1]) {
-		const numeric = String(Number.parseInt(milestoneIdMatch[1], 10));
-		addKey(`m-${numeric}`);
+	const milestoneIdMatch = normalized.match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+	if (milestoneIdMatch?.[1] && milestoneIdMatch?.[2]) {
+		const prefix = milestoneIdMatch[1].toLowerCase();
+		const numeric = String(Number.parseInt(milestoneIdMatch[2], 10));
+		addKey(`${prefix}-${numeric}`);
 		addKey(numeric);
 	}
 
@@ -53,14 +53,11 @@ function canonicalMilestoneId(value: string): string | null {
 	if (!normalized) {
 		return null;
 	}
-	if (/^\d+$/.test(normalized)) {
-		const numeric = String(Number.parseInt(normalized, 10));
-		return `m-${numeric}`;
-	}
-	const milestoneIdMatch = normalized.match(/^m-(\d+)$/i);
-	if (milestoneIdMatch?.[1]) {
-		const numeric = String(Number.parseInt(milestoneIdMatch[1], 10));
-		return `m-${numeric}`;
+	const milestoneIdMatch = normalized.match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+	if (milestoneIdMatch?.[1] && milestoneIdMatch?.[2]) {
+		const prefix = milestoneIdMatch[1].toLowerCase();
+		const numeric = String(Number.parseInt(milestoneIdMatch[2], 10));
+		return `${prefix}-${numeric}`;
 	}
 	return null;
 }
@@ -93,7 +90,7 @@ function findMatchingMilestone(name: string, milestones: Milestone[]): Milestone
 	if (!inputKey) {
 		return undefined;
 	}
-	const looksLikeMilestoneId = /^m-\d+$/i.test(normalized) || /^\d+$/.test(normalized);
+	const looksLikeMilestoneId = /^[a-zA-Z][a-zA-Z0-9]*-\d+$/i.test(normalized) || /^\d+$/.test(normalized);
 	const idMatch = findMatchingMilestoneId(normalized, milestones);
 	const titleMatches = milestones.filter((milestone) => milestoneKey(milestone.title) === inputKey);
 	const uniqueTitleMatch = titleMatches.length === 1 ? titleMatches[0] : undefined;

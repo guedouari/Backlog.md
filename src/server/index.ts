@@ -96,22 +96,19 @@ export class BacklogServer {
 
 		const key = normalized.toLowerCase();
 		const aliasKeys = new Set<string>([key]);
-		const looksLikeMilestoneId = /^\d+$/.test(normalized) || /^m-\d+$/i.test(normalized);
-		const canonicalInputId =
-			/^\d+$/.test(normalized) || /^m-\d+$/i.test(normalized)
-				? `m-${String(Number.parseInt(normalized.replace(/^m-/i, ""), 10))}`
-				: null;
+		const idPrefixMatch = normalized.match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+		const looksLikeMilestoneId = /^\d+$/.test(normalized) || idPrefixMatch !== null;
+		const canonicalInputId = idPrefixMatch?.[1] && idPrefixMatch?.[2]
+			? `${idPrefixMatch[1].toLowerCase()}-${String(Number.parseInt(idPrefixMatch[2], 10))}`
+			: null;
 		if (/^\d+$/.test(normalized)) {
 			const numeric = String(Number.parseInt(normalized, 10));
 			aliasKeys.add(numeric);
-			aliasKeys.add(`m-${numeric}`);
-		} else {
-			const match = normalized.match(/^m-(\d+)$/i);
-			if (match?.[1]) {
-				const numeric = String(Number.parseInt(match[1], 10));
-				aliasKeys.add(numeric);
-				aliasKeys.add(`m-${numeric}`);
-			}
+		} else if (idPrefixMatch?.[1] && idPrefixMatch?.[2]) {
+			const prefix = idPrefixMatch[1].toLowerCase();
+			const numeric = String(Number.parseInt(idPrefixMatch[2], 10));
+			aliasKeys.add(numeric);
+			aliasKeys.add(`${prefix}-${numeric}`);
 		}
 		const [activeMilestones, archivedMilestones] = await Promise.all([
 			this.core.filesystem.listMilestones(),
@@ -122,16 +119,13 @@ export class BacklogServer {
 			if (aliasKeys.has(idKey)) {
 				return true;
 			}
-			if (/^\d+$/.test(milestoneId.trim())) {
-				const numeric = String(Number.parseInt(milestoneId.trim(), 10));
-				return aliasKeys.has(numeric) || aliasKeys.has(`m-${numeric}`);
-			}
-			const idMatch = milestoneId.trim().match(/^m-(\d+)$/i);
-			if (!idMatch?.[1]) {
+			const idMatch = milestoneId.trim().match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+			if (!idMatch?.[1] || !idMatch?.[2]) {
 				return false;
 			}
-			const numeric = String(Number.parseInt(idMatch[1], 10));
-			return aliasKeys.has(numeric) || aliasKeys.has(`m-${numeric}`);
+			const prefix = idMatch[1].toLowerCase();
+			const numeric = String(Number.parseInt(idMatch[2], 10));
+			return aliasKeys.has(numeric) || aliasKeys.has(`${prefix}-${numeric}`);
 		};
 		const findIdMatch = (
 			milestones: Array<{ id: string; title: string }>,
@@ -1257,14 +1251,14 @@ export class BacklogServer {
 				if (/^\d+$/.test(normalized)) {
 					const numeric = String(Number.parseInt(normalized, 10));
 					keys.add(numeric);
-					keys.add(`m-${numeric}`);
 					return keys;
 				}
-				const match = normalized.match(/^m-(\d+)$/);
-				if (match?.[1]) {
-					const numeric = String(Number.parseInt(match[1], 10));
+				const match = normalized.match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/);
+				if (match?.[1] && match?.[2]) {
+					const prefix = match[1].toLowerCase();
+					const numeric = String(Number.parseInt(match[2], 10));
 					keys.add(numeric);
-					keys.add(`m-${numeric}`);
+					keys.add(`${prefix}-${numeric}`);
 				}
 				return keys;
 			};

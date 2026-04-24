@@ -68,38 +68,32 @@ export class TaskHandlers {
 		const normalized = milestone.trim();
 		const inputKey = milestoneKey(normalized);
 		const aliasKeys = new Set<string>([inputKey]);
-		const looksLikeMilestoneId = /^\d+$/.test(normalized) || /^m-\d+$/i.test(normalized);
-		const canonicalInputId =
-			/^\d+$/.test(normalized) || /^m-\d+$/i.test(normalized)
-				? `m-${String(Number.parseInt(normalized.replace(/^m-/i, ""), 10))}`
-				: null;
+		const looksLikeMilestoneId = /^\d+$/.test(normalized) || /^[a-zA-Z][a-zA-Z0-9]*-\d+$/i.test(normalized);
+		const idPrefixMatch = normalized.match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+		const canonicalInputId = idPrefixMatch?.[1] && idPrefixMatch?.[2]
+			? `${idPrefixMatch[1].toLowerCase()}-${String(Number.parseInt(idPrefixMatch[2], 10))}`
+			: null;
 		if (/^\d+$/.test(normalized)) {
 			const numericAlias = String(Number.parseInt(normalized, 10));
 			aliasKeys.add(numericAlias);
-			aliasKeys.add(`m-${numericAlias}`);
-		} else {
-			const idMatch = normalized.match(/^m-(\d+)$/i);
-			if (idMatch?.[1]) {
-				const numericAlias = String(Number.parseInt(idMatch[1], 10));
-				aliasKeys.add(numericAlias);
-				aliasKeys.add(`m-${numericAlias}`);
-			}
+		} else if (idPrefixMatch?.[1] && idPrefixMatch?.[2]) {
+			const prefix = idPrefixMatch[1].toLowerCase();
+			const numericAlias = String(Number.parseInt(idPrefixMatch[2], 10));
+			aliasKeys.add(numericAlias);
+			aliasKeys.add(`${prefix}-${numericAlias}`);
 		}
 		const idMatchesAlias = (milestoneId: string): boolean => {
 			const idKey = milestoneKey(milestoneId);
 			if (aliasKeys.has(idKey)) {
 				return true;
 			}
-			if (/^\d+$/.test(milestoneId.trim())) {
-				const numericAlias = String(Number.parseInt(milestoneId.trim(), 10));
-				return aliasKeys.has(numericAlias) || aliasKeys.has(`m-${numericAlias}`);
-			}
-			const idMatch = milestoneId.trim().match(/^m-(\d+)$/i);
-			if (!idMatch?.[1]) {
+			const idMatch = milestoneId.trim().match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+			if (!idMatch?.[1] || !idMatch?.[2]) {
 				return false;
 			}
-			const numericAlias = String(Number.parseInt(idMatch[1], 10));
-			return aliasKeys.has(numericAlias) || aliasKeys.has(`m-${numericAlias}`);
+			const prefix = idMatch[1].toLowerCase();
+			const numericAlias = String(Number.parseInt(idMatch[2], 10));
+			return aliasKeys.has(numericAlias) || aliasKeys.has(`${prefix}-${numericAlias}`);
 		};
 		const findIdMatch = (milestones: Milestone[]): Milestone | undefined => {
 			const rawExactMatch = milestones.find((item) => milestoneKey(item.id) === inputKey);

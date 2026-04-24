@@ -67,13 +67,13 @@ function buildMilestoneAliasMap(
 		if (/^\d+$/.test(value.trim())) {
 			const numericAlias = String(Number.parseInt(value.trim(), 10));
 			keys.add(numericAlias);
-			keys.add(`m-${numericAlias}`);
 			return Array.from(keys);
 		}
-		const idMatch = value.trim().match(/^m-(\d+)$/i);
-		if (idMatch?.[1]) {
-			const numericAlias = String(Number.parseInt(idMatch[1], 10));
-			keys.add(`m-${numericAlias}`);
+		const idMatch = value.trim().match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+		if (idMatch?.[1] && idMatch?.[2]) {
+			const prefix = idMatch[1].toLowerCase();
+			const numericAlias = String(Number.parseInt(idMatch[2], 10));
+			keys.add(`${prefix}-${numericAlias}`);
 			keys.add(numericAlias);
 		}
 		return Array.from(keys);
@@ -95,7 +95,8 @@ function buildMilestoneAliasMap(
 		}
 		const existingKey = existing.toLowerCase();
 		const nextKey = normalizedId.toLowerCase();
-		const preferredRawId = /^\d+$/.test(aliasKey) ? `m-${aliasKey}` : /^m-\d+$/.test(aliasKey) ? aliasKey : null;
+		// Prefer the exact ID form (alpha-prefix-number) when resolving tie-breaks
+		const preferredRawId = /^[a-zA-Z][a-zA-Z0-9]*-\d+$/.test(aliasKey) ? aliasKey : null;
 		if (preferredRawId) {
 			const existingIsPreferred = existingKey === preferredRawId;
 			const nextIsPreferred = nextKey === preferredRawId;
@@ -115,12 +116,13 @@ function buildMilestoneAliasMap(
 		if (idKey) {
 			setAlias(idKey, normalizedId, allowOverwrite);
 		}
-		const idMatch = normalizedId.match(/^m-(\d+)$/i);
-		if (!idMatch?.[1]) {
+		const idMatch = normalizedId.match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+		if (!idMatch?.[1] || !idMatch?.[2]) {
 			return;
 		}
-		const numericAlias = String(Number.parseInt(idMatch[1], 10));
-		const canonicalId = `m-${numericAlias}`;
+		const prefix = idMatch[1].toLowerCase();
+		const numericAlias = String(Number.parseInt(idMatch[2], 10));
+		const canonicalId = `${prefix}-${numericAlias}`;
 		if (canonicalId) {
 			setAlias(canonicalId, normalizedId, allowOverwrite);
 		}
@@ -181,14 +183,15 @@ function canonicalizeMilestoneValue(value: string | null | undefined, aliasMap: 
 	if (direct) {
 		return direct;
 	}
-	const idMatch = normalized.match(/^m-(\d+)$/i);
-	if (idMatch?.[1]) {
-		const numericAlias = String(Number.parseInt(idMatch[1], 10));
-		return aliasMap.get(`m-${numericAlias}`) ?? aliasMap.get(numericAlias) ?? normalized;
+	const idMatch = normalized.match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+	if (idMatch?.[1] && idMatch?.[2]) {
+		const prefix = idMatch[1].toLowerCase();
+		const numericAlias = String(Number.parseInt(idMatch[2], 10));
+		return aliasMap.get(`${prefix}-${numericAlias}`) ?? aliasMap.get(numericAlias) ?? normalized;
 	}
 	if (/^\d+$/.test(normalized)) {
 		const numericAlias = String(Number.parseInt(normalized, 10));
-		return aliasMap.get(`m-${numericAlias}`) ?? aliasMap.get(numericAlias) ?? normalized;
+		return aliasMap.get(numericAlias) ?? normalized;
 	}
 	return normalized;
 }

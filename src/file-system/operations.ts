@@ -10,9 +10,13 @@ import { normalizeProjectBacklogDirectory, resolveBacklogDirectory } from "../ut
 import { documentIdsEqual, normalizeDocumentId } from "../utils/document-id.ts";
 import {
 	buildGlobPattern,
+	DEFAULT_DOC_PREFIX,
+	DEFAULT_MILESTONE_PREFIX,
 	extractAnyPrefix,
 	generateNextId,
 	getDecisionPrefixes,
+	getDocPrefix,
+	getMilestonePrefix,
 	getTaskPrefixes,
 	idForFilename,
 	normalizeId,
@@ -776,7 +780,9 @@ export class FileSystem {
 	// Document operations
 	async saveDocument(document: Document, subPath = ""): Promise<string> {
 		const docsDir = await this.getDocsDir();
-		const canonicalId = normalizeDocumentId(document.id);
+		const config = await this.loadConfig();
+		const docPrefix = getDocPrefix(config ?? undefined);
+		const canonicalId = normalizeDocumentId(document.id, docPrefix);
 		document.id = canonicalId;
 		const filename = `${canonicalId} - ${this.sanitizeFilename(document.title)}.md`;
 		const subPathSegments = subPath
@@ -789,7 +795,7 @@ export class FileSystem {
 
 		await this.ensureDirectoryExists(dirname(filepath));
 
-		const glob = new Bun.Glob("**/doc-*.md");
+		const glob = new Bun.Glob(`**/${docPrefix}-*.md`);
 		const existingMatches = await Array.fromAsync(glob.scan({ cwd: docsDir, followSymlinks: true }));
 		const matchesForId = existingMatches.filter((relative) => {
 			const base = relative.split("/").pop() || relative;
@@ -906,8 +912,9 @@ export class FileSystem {
 		return document;
 	}
 
-	private buildMilestoneIdentifierKeys(identifier: string): Set<string> {
+	private buildMilestoneIdentifierKeys(identifier: string, milestonePrefix = DEFAULT_MILESTONE_PREFIX): Set<string> {
 		const normalized = identifier.trim().toLowerCase();
+		const prefix = milestonePrefix.toLowerCase();
 		const keys = new Set<string>();
 		if (!normalized) {
 			return keys;
@@ -918,15 +925,15 @@ export class FileSystem {
 		if (/^\d+$/.test(normalized)) {
 			const numeric = String(Number.parseInt(normalized, 10));
 			keys.add(numeric);
-			keys.add(`m-${numeric}`);
+			keys.add(`${prefix}-${numeric}`);
 			return keys;
 		}
 
-		const milestoneIdMatch = normalized.match(/^m-(\d+)$/);
+		const milestoneIdMatch = normalized.match(new RegExp(`^${prefix}-(\\d+)$`));
 		if (milestoneIdMatch?.[1]) {
 			const numeric = String(Number.parseInt(milestoneIdMatch[1], 10));
 			keys.add(numeric);
-			keys.add(`m-${numeric}`);
+			keys.add(`${prefix}-${numeric}`);
 		}
 
 		return keys;
@@ -973,21 +980,25 @@ ${rawContent.trim()}
 		content: string;
 		milestone: Milestone;
 	} | null> {
+		const config = await this.loadConfig();
+		const milestonePrefix = getMilestonePrefix(config ?? undefined);
 		const normalizedInput = identifier.trim().toLowerCase();
-		const candidateKeys = this.buildMilestoneIdentifierKeys(identifier);
+		const candidateKeys = this.buildMilestoneIdentifierKeys(identifier, milestonePrefix);
 		if (candidateKeys.size === 0) {
 			return null;
 		}
 		const variantKeys = new Set<string>(candidateKeys);
 		variantKeys.delete(normalizedInput);
+		const prefixLower = milestonePrefix.toLowerCase();
+		const prefixPattern = new RegExp(`^${prefixLower}-\\d+$`);
 		const canonicalInputId =
-			/^\d+$/.test(normalizedInput) || /^m-\d+$/.test(normalizedInput)
-				? `m-${String(Number.parseInt(normalizedInput.replace(/^m-/, ""), 10))}`
+			/^\d+$/.test(normalizedInput) || prefixPattern.test(normalizedInput)
+				? `${prefixLower}-${String(Number.parseInt(normalizedInput.replace(new RegExp(`^${prefixLower}-`), ""), 10))}`
 				: null;
 
 		const milestonesDir = scope === "archived" ? await this.getArchiveMilestonesDir() : await this.getMilestonesDir();
 		const milestoneFiles = await Array.fromAsync(
-			new Bun.Glob("m-*.md").scan({ cwd: milestonesDir, followSymlinks: true }),
+			new Bun.Glob(`${milestonePrefix}-*.md`).scan({ cwd: milestonesDir, followSymlinks: true }),
 		);
 
 		const rawExactIdMatches: Array<{ file: string; filepath: string; content: string; milestone: Milestone }> = [];
@@ -1038,7 +1049,7 @@ ${rawContent.trim()}
 			}
 		}
 
-		const preferIdMatches = /^\d+$/.test(normalizedInput) || /^m-\d+$/.test(normalizedInput);
+		const preferIdMatches = /^\d+$/.test(normalizedInput) || prefixPattern.test(normalizedInput);
 		const exactTitleMatch = exactTitleMatches.length === 1 ? exactTitleMatches[0] : null;
 		const variantTitleMatch = variantTitleMatches.length === 1 ? variantTitleMatches[0] : null;
 		const exactAliasIdMatch = exactAliasIdMatches.length === 1 ? exactAliasIdMatches[0] : null;
@@ -1062,9 +1073,11 @@ ${rawContent.trim()}
 	// Milestone operations
 	async listMilestones(): Promise<Milestone[]> {
 		try {
+			const config = await this.loadConfig();
+			const milestonePrefix = getMilestonePrefix(config ?? undefined);
 			const milestonesDir = await this.getMilestonesDir();
 			const milestoneFiles = await Array.fromAsync(
-				new Bun.Glob("m-*.md").scan({ cwd: milestonesDir, followSymlinks: true }),
+				new Bun.Glob(`${milestonePrefix}-*.md`).scan({ cwd: milestonesDir, followSymlinks: true }),
 			);
 			const milestones: Milestone[] = [];
 			for (const file of milestoneFiles) {
@@ -1085,9 +1098,11 @@ ${rawContent.trim()}
 
 	async listArchivedMilestones(): Promise<Milestone[]> {
 		try {
+			const config = await this.loadConfig();
+			const milestonePrefix = getMilestonePrefix(config ?? undefined);
 			const milestonesDir = await this.getArchiveMilestonesDir();
 			const milestoneFiles = await Array.fromAsync(
-				new Bun.Glob("m-*.md").scan({ cwd: milestonesDir, followSymlinks: true }),
+				new Bun.Glob(`${milestonePrefix}-*.md`).scan({ cwd: milestonesDir, followSymlinks: true }),
 			);
 			const milestones: Milestone[] = [];
 			for (const file of milestoneFiles) {
@@ -1114,6 +1129,8 @@ ${rawContent.trim()}
 	}
 
 	async createMilestone(title: string, description?: string): Promise<Milestone> {
+		const config = await this.loadConfig();
+		const milestonePrefix = getMilestonePrefix(config ?? undefined);
 		const milestonesDir = await this.getMilestonesDir();
 
 		// Ensure milestones directory exists
@@ -1123,9 +1140,10 @@ ${rawContent.trim()}
 		const archiveMilestonesDir = await this.getArchiveMilestonesDir();
 		await mkdir(archiveMilestonesDir, { recursive: true });
 		const [existingFiles, archivedFiles] = await Promise.all([
-			Array.fromAsync(new Bun.Glob("m-*.md").scan({ cwd: milestonesDir, followSymlinks: true })),
-			Array.fromAsync(new Bun.Glob("m-*.md").scan({ cwd: archiveMilestonesDir, followSymlinks: true })),
+			Array.fromAsync(new Bun.Glob(`${milestonePrefix}-*.md`).scan({ cwd: milestonesDir, followSymlinks: true })),
+			Array.fromAsync(new Bun.Glob(`${milestonePrefix}-*.md`).scan({ cwd: archiveMilestonesDir, followSymlinks: true })),
 		]);
+		const prefixPattern = new RegExp(`^${milestonePrefix.toLowerCase()}-(\\d+)`, "i");
 		const parseMilestoneId = async (dir: string, file: string): Promise<number | null> => {
 			if (file.toLowerCase() === "readme.md") {
 				return null;
@@ -1134,14 +1152,14 @@ ${rawContent.trim()}
 			try {
 				const content = await Bun.file(filepath).text();
 				const parsed = parseMilestone(content);
-				const parsedIdMatch = parsed.id.match(/^m-(\d+)$/i);
+				const parsedIdMatch = parsed.id.match(new RegExp(`^${milestonePrefix}-(\\d+)$`, "i"));
 				if (parsedIdMatch?.[1]) {
 					return Number.parseInt(parsedIdMatch[1], 10);
 				}
 			} catch {
 				// Fall through to filename-based fallback.
 			}
-			const filenameIdMatch = file.match(/^m-(\d+)/i);
+			const filenameIdMatch = file.match(prefixPattern);
 			if (filenameIdMatch?.[1]) {
 				return Number.parseInt(filenameIdMatch[1], 10);
 			}
@@ -1155,7 +1173,7 @@ ${rawContent.trim()}
 		).filter((id): id is number => typeof id === "number" && id >= 0);
 
 		const nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 0;
-		const id = `m-${nextId}`;
+		const id = `${milestonePrefix}-${nextId}`;
 
 		const filename = this.buildMilestoneFilename(id, title);
 		const content = this.serializeMilestoneContent(
@@ -1448,6 +1466,12 @@ ${description || `Milestone: ${title}`}`,
 						config.prefixes = { ...(config.prefixes ?? { task: "task" }), taskPrefixes: parsed };
 					}
 					break;
+				case "doc_prefix":
+					config.prefixes = { ...(config.prefixes ?? { task: "task" }), doc: value.replace(/['"]/g, "") };
+					break;
+				case "milestone_prefix":
+					config.prefixes = { ...(config.prefixes ?? { task: "task" }), milestone: value.replace(/['"]/g, "") };
+					break;
 				case "decision_prefixes":
 					if (value.startsWith("[") && value.endsWith("]")) {
 						const arrayContent = value.slice(1, -1);
@@ -1520,6 +1544,8 @@ ${description || `Milestone: ${title}`}`,
 			...(Array.isArray(config.prefixes?.taskPrefixes) && config.prefixes.taskPrefixes.length > 0
 				? [`task_prefixes: [${config.prefixes.taskPrefixes.map((p) => `"${p}"`).join(", ")}]`]
 				: []),
+			...(config.prefixes?.doc ? [`doc_prefix: "${config.prefixes.doc}"`] : []),
+			...(config.prefixes?.milestone ? [`milestone_prefix: "${config.prefixes.milestone}"`] : []),
 			...(Array.isArray(config.prefixes?.decisionPrefixes) && config.prefixes.decisionPrefixes.length > 0
 				? [`decision_prefixes: [${config.prefixes.decisionPrefixes.map((p) => `"${p}"`).join(", ")}]`]
 				: []),

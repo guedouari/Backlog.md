@@ -36,6 +36,11 @@ Running `backlog config` with no arguments launches the interactive advanced wiz
 | `checkActiveBranches` | Check task states across active branches for accuracy | `true` |
 | `activeBranchDays` | How many days a branch is considered active | `30` |
 | `onStatusChange`  | Shell command to run on status change | `(disabled)` |
+| `task_prefix`     | Default prefix for new tasks (single prefix, overridden by `task_prefixes`) | `back` |
+| `task_prefixes`   | Allowed task prefixes — first entry is used for new tasks | `[back]` |
+| `decision_prefixes` | Allowed decision prefixes — first entry is used for new decisions | `[decision]` |
+| `doc_prefix`      | Prefix for new documents | `doc` |
+| `milestone_prefix`| Prefix for new milestones | `m` |
 
 ## Detailed Notes
 
@@ -52,3 +57,17 @@ Running `backlog config` with no arguments launches the interactive advanced wiz
 > **Status Change Callbacks**: Set `onStatusChange` to run a shell command whenever a task's status changes. Available variables: `$TASK_ID`, `$OLD_STATUS`, `$NEW_STATUS`, `$TASK_TITLE`. Per-task override via `onStatusChange` in task frontmatter. Example: `'if [ "$NEW_STATUS" = "In Progress" ]; then claude "Task $TASK_ID ($TASK_TITLE) has been assigned to you. Please implement it." & fi'`
 
 > **Date/Time Support**: Backlog.md now supports datetime precision for all dates. New items automatically include time (YYYY-MM-DD HH:mm format in UTC), while existing date-only entries remain unchanged for backward compatibility. Use the migration script `bun src/scripts/migrate-dates.ts` to optionally add time to existing items.
+
+> **Prefix Configuration**: All entity prefixes are user-configurable. Tasks support multiple prefixes (`task_prefixes: [back, epic, feat, bug]`) for visual categorisation — the first entry is used when creating new tasks. Decisions similarly support multiple prefixes (`decision_prefixes: [decision, adr, dsc]`). Documents and milestones use single prefixes (`doc_prefix: doc`, `milestone_prefix: m`). All defaults match the previous behaviour, so existing projects are unaffected unless you set these values explicitly. Example `.backlog/config.yml` snippet:
+> ```yaml
+> task_prefixes:
+>   - back
+>   - epic
+>   - feat
+>   - bug
+> decision_prefixes:
+>   - decision
+>   - adr
+> doc_prefix: doc
+> milestone_prefix: sprint
+> ```

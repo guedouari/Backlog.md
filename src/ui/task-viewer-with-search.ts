@@ -51,10 +51,11 @@ function createMilestoneLabelResolver(milestones: Milestone[]): (milestone: stri
 		const normalizedTitle = milestone.title.trim();
 		if (!normalizedId || !normalizedTitle) continue;
 		milestoneLabelsByKey.set(normalizedId.toLowerCase(), normalizedTitle);
-		const idMatch = normalizedId.match(/^m-(\d+)$/i);
-		if (idMatch?.[1]) {
-			const numericAlias = String(Number.parseInt(idMatch[1], 10));
-			milestoneLabelsByKey.set(`m-${numericAlias}`, normalizedTitle);
+		const idMatch = normalizedId.match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+		if (idMatch?.[1] && idMatch?.[2]) {
+			const prefix = idMatch[1].toLowerCase();
+			const numericAlias = String(Number.parseInt(idMatch[2], 10));
+			milestoneLabelsByKey.set(`${prefix}-${numericAlias}`, normalizedTitle);
 			milestoneLabelsByKey.set(numericAlias, normalizedTitle);
 		}
 		milestoneLabelsByKey.set(normalizedTitle.toLowerCase(), normalizedTitle);

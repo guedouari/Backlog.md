@@ -210,10 +210,11 @@ export function generateMilestoneGroupedBoard(
 
 		if (normalizedId) {
 			aliasToMilestone.set(idKey, normalizedId);
-			const idAliasMatch = normalizedId.match(/^m-(\d+)$/i);
-			if (idAliasMatch?.[1]) {
-				const numericAlias = String(Number.parseInt(idAliasMatch[1], 10));
-				aliasToMilestone.set(`m-${numericAlias}`, normalizedId);
+			const idAliasMatch = normalizedId.match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+			if (idAliasMatch?.[1] && idAliasMatch?.[2]) {
+				const prefix = idAliasMatch[1].toLowerCase();
+				const numericAlias = String(Number.parseInt(idAliasMatch[2], 10));
+				aliasToMilestone.set(`${prefix}-${numericAlias}`, normalizedId);
 				if (!aliasToMilestone.has(numericAlias)) {
 					aliasToMilestone.set(numericAlias, normalizedId);
 				}
@@ -238,14 +239,15 @@ export function generateMilestoneGroupedBoard(
 		if (direct) {
 			return direct;
 		}
-		const idMatch = normalized.match(/^m-(\d+)$/i);
-		if (idMatch?.[1]) {
-			const numericAlias = String(Number.parseInt(idMatch[1], 10));
-			return aliasToMilestone.get(`m-${numericAlias}`) ?? aliasToMilestone.get(numericAlias) ?? normalized;
+		const idMatch = normalized.match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+		if (idMatch?.[1] && idMatch?.[2]) {
+			const prefix = idMatch[1].toLowerCase();
+			const numericAlias = String(Number.parseInt(idMatch[2], 10));
+			return aliasToMilestone.get(`${prefix}-${numericAlias}`) ?? aliasToMilestone.get(numericAlias) ?? normalized;
 		}
 		if (/^\d+$/.test(normalized)) {
 			const numericAlias = String(Number.parseInt(normalized, 10));
-			return aliasToMilestone.get(`m-${numericAlias}`) ?? aliasToMilestone.get(numericAlias) ?? normalized;
+			return aliasToMilestone.get(numericAlias) ?? normalized;
 		}
 		return normalized;
 	};

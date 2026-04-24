@@ -18,6 +18,16 @@ export const DRAFT_PREFIX = "draft";
 export const DEFAULT_DECISION_PREFIX = "decision";
 
 /**
+ * Default document prefix when none is configured.
+ */
+export const DEFAULT_DOC_PREFIX = "doc";
+
+/**
+ * Default milestone prefix when none is configured.
+ */
+export const DEFAULT_MILESTONE_PREFIX = "m";
+
+/**
  * Returns the default prefix configuration.
  * Use this when no custom config is specified.
  */
@@ -88,6 +98,34 @@ export function getDecisionPrefixes(config?: BacklogConfig): string[] {
 }
 
 /**
+ * Returns the configured document prefix (default: "doc").
+ *
+ * @param config - Optional backlog config
+ * @returns Normalized document prefix
+ *
+ * @example
+ * getDocPrefix()                                           // => "doc"
+ * getDocPrefix({ prefixes: { task: "back", doc: "wiki" } }) // => "wiki"
+ */
+export function getDocPrefix(config?: BacklogConfig): string {
+	return normalizePrefix(config?.prefixes?.doc ?? DEFAULT_DOC_PREFIX);
+}
+
+/**
+ * Returns the configured milestone prefix (default: "m").
+ *
+ * @param config - Optional backlog config
+ * @returns Normalized milestone prefix
+ *
+ * @example
+ * getMilestonePrefix()                                                // => "m"
+ * getMilestonePrefix({ prefixes: { task: "back", milestone: "v" } }) // => "v"
+ */
+export function getMilestonePrefix(config?: BacklogConfig): string {
+	return normalizePrefix(config?.prefixes?.milestone ?? DEFAULT_MILESTONE_PREFIX);
+}
+
+/**
  * Merges user-provided prefix config with defaults.
  * Missing fields are filled with default values.
  *
@@ -98,6 +136,8 @@ export function mergePrefixConfig(config?: Partial<PrefixConfig>): PrefixConfig 
 	return {
 		task: config?.task ?? DEFAULT_PREFIX_CONFIG.task,
 		...(config?.taskPrefixes !== undefined ? { taskPrefixes: config.taskPrefixes } : {}),
+		...(config?.doc !== undefined ? { doc: config.doc } : {}),
+		...(config?.milestone !== undefined ? { milestone: config.milestone } : {}),
 		...(config?.decisionPrefixes !== undefined ? { decisionPrefixes: config.decisionPrefixes } : {}),
 	};
 }
@@ -446,6 +486,7 @@ export function escapeRegex(str: string): string {
  * getPrefixForType(EntityType.Task, { prefixes: { task: "JIRA" } }) // => "JIRA"
  * getPrefixForType(EntityType.Draft) // => "draft"
  * getPrefixForType(EntityType.Document) // => "doc"
+ * getPrefixForType(EntityType.Document, { prefixes: { task: "back", doc: "wiki" } }) // => "wiki"
  * getPrefixForType(EntityType.Decision) // => "decision"
  */
 export function getPrefixForType(type: EntityType, config?: BacklogConfig): string {
@@ -455,7 +496,7 @@ export function getPrefixForType(type: EntityType, config?: BacklogConfig): stri
 		case EntityType.Draft:
 			return DRAFT_PREFIX;
 		case EntityType.Document:
-			return "doc";
+			return getDocPrefix(config);
 		case EntityType.Decision:
 			return "decision";
 		default:

@@ -133,15 +133,18 @@ function resolveMilestoneValueForReporting(
 		return "";
 	}
 	const inputKey = milestoneKey(normalized);
-	const looksLikeMilestoneId = /^\d+$/.test(normalized) || /^m-\d+$/i.test(normalized);
-	const canonicalInputId = looksLikeMilestoneId
-		? `m-${String(Number.parseInt(normalized.replace(/^m-/i, ""), 10))}`
+	const looksLikeMilestoneId = /^\d+$/.test(normalized) || /^[a-zA-Z][a-zA-Z0-9]*-\d+$/i.test(normalized);
+	const idPrefixMatch = normalized.match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+	const canonicalInputId = idPrefixMatch?.[1] && idPrefixMatch?.[2]
+		? `${idPrefixMatch[1].toLowerCase()}-${String(Number.parseInt(idPrefixMatch[2], 10))}`
 		: null;
 	const aliasKeys = new Set<string>([inputKey]);
 	if (canonicalInputId) {
-		const numericAlias = canonicalInputId.replace(/^m-/, "");
+		const numericAlias = String(Number.parseInt(idPrefixMatch![2]!, 10));
 		aliasKeys.add(canonicalInputId);
 		aliasKeys.add(numericAlias);
+	} else if (/^\d+$/.test(normalized)) {
+		aliasKeys.add(String(Number.parseInt(normalized, 10)));
 	}
 
 	const idMatchesAlias = (milestoneId: string): boolean => {
@@ -149,12 +152,13 @@ function resolveMilestoneValueForReporting(
 		if (aliasKeys.has(idKey)) {
 			return true;
 		}
-		const idMatch = milestoneId.trim().match(/^m-(\d+)$/i);
-		if (!idMatch?.[1]) {
+		const idMatch = milestoneId.trim().match(/^([a-zA-Z][a-zA-Z0-9]*)-(\d+)$/i);
+		if (!idMatch?.[1] || !idMatch?.[2]) {
 			return false;
 		}
-		const numericAlias = String(Number.parseInt(idMatch[1], 10));
-		return aliasKeys.has(`m-${numericAlias}`) || aliasKeys.has(numericAlias);
+		const prefix = idMatch[1].toLowerCase();
+		const numericAlias = String(Number.parseInt(idMatch[2], 10));
+		return aliasKeys.has(`${prefix}-${numericAlias}`) || aliasKeys.has(numericAlias);
 	};
 	const findIdMatch = (milestones: Milestone[]): Milestone | undefined => {
 		const rawExactMatch = milestones.find((milestone) => milestoneKey(milestone.id) === inputKey);

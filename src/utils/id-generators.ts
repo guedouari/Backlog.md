@@ -1,3 +1,4 @@
+import { getDocPrefix } from "./prefix-config.ts";
 import type { Core } from "../index.ts";
 
 /**
@@ -7,6 +8,7 @@ import type { Core } from "../index.ts";
  */
 export async function generateNextDocId(core: Core): Promise<string> {
 	const config = await core.filesystem.loadConfig();
+	const docPrefix = getDocPrefix(config);
 	// Load local documents
 	const docs = await core.filesystem.listDocuments();
 	const allIds: string[] = [];
@@ -28,10 +30,11 @@ export async function generateNextDocId(core: Core): Promise<string> {
 		// Load files from all branches in parallel
 		const branchFilePromises = branches.map(async (branch) => {
 			const files = await core.gitOps.listFilesInTree(branch, `${backlogDir}/docs`);
+			const prefixPattern = new RegExp(`${docPrefix}-(\\d+)`);
 			return files
 				.map((file) => {
-					const match = file.match(/doc-(\d+)/);
-					return match ? `doc-${match[1]}` : null;
+					const match = file.match(prefixPattern);
+					return match ? `${docPrefix}-${match[1]}` : null;
 				})
 				.filter((id): id is string => id !== null);
 		});
@@ -54,8 +57,9 @@ export async function generateNextDocId(core: Core): Promise<string> {
 
 	// Find the highest numeric ID
 	let max = 0;
+	const idPattern = new RegExp(`^${docPrefix}-(\\d+)$`);
 	for (const id of allIds) {
-		const match = id.match(/^doc-(\d+)$/);
+		const match = id.match(idPattern);
 		if (match) {
 			const num = Number.parseInt(match[1] || "0", 10);
 			if (num > max) max = num;
@@ -67,10 +71,10 @@ export async function generateNextDocId(core: Core): Promise<string> {
 
 	if (padding && typeof padding === "number" && padding > 0) {
 		const paddedId = String(nextIdNumber).padStart(padding, "0");
-		return `doc-${paddedId}`;
+		return `${docPrefix}-${paddedId}`;
 	}
 
-	return `doc-${nextIdNumber}`;
+	return `${docPrefix}-${nextIdNumber}`;
 }
 
 /**

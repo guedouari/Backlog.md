@@ -260,6 +260,10 @@ export interface PrefixConfig {
 	 * All prefixes in this list are scanned alongside the primary prefix.
 	 */
 	taskPrefixes?: string[];
+	/** Prefix for document IDs (default: "doc") - produces IDs like doc-1, doc-2 */
+	doc?: string;
+	/** Prefix for milestone IDs (default: "m") - produces IDs like m-0, m-1 */
+	milestone?: string;
 	/**
 	 * List of prefixes for decision files (default: ["decision"]).
 	 * Supports additional decision categories like "adr", "dsc", "apr".

@@ -465,7 +465,7 @@ export class ContentStore {
 				return;
 			}
 
-			if (!base.startsWith("doc-")) {
+			if (!/^[a-zA-Z][a-zA-Z0-9]*-\d+/.test(base)) {
 				await this.refreshDocumentsFromDisk();
 				return;
 			}
